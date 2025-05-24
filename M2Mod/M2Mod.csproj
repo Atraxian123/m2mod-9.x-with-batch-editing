@@ -1,270 +1,55 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\Costura.Fody.4.1.0\build\Costura.Fody.props" Condition="Exists('..\packages\Costura.Fody.4.1.0\build\Costura.Fody.props')" />
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{804C5F6F-D8A8-45C0-BAD6-A52E7B69049F}</ProjectGuid>
+    <TargetFramework>net9.0-windows</TargetFramework>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>M2Mod</RootNamespace>
-    <AssemblyName>M2Mod</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>false</Deterministic>
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
+    <LangVersion>default</LangVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <Configurations>Debug Shared;Debug;Release</Configurations>
+    <ApplicationIcon>Resources\Icon.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
     <OutputPath>..\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
     <OutputPath>..\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
-  <PropertyGroup>
-    <ApplicationIcon>app.ico</ApplicationIcon>
+    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug Shared|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\Dubug Shared\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <OutputPath>bin\Debug Shared\</OutputPath>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DebugType>full</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <Prefer32Bit>true</Prefer32Bit>
+    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Costura, Version=4.1.0.0, Culture=neutral, PublicKeyToken=9919ef960d84173d, processorArchitecture=MSIL">
-      <HintPath>..\packages\Costura.Fody.4.1.0\lib\net40\Costura.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.12.0.3-beta1\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Deployment" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Config\NormalizationConfig.cs" />
-    <Compile Include="Config\Normalization\AdvancedConfig.cs" />
-    <Compile Include="Config\Normalization\SimpleConfig.cs" />
-    <Compile Include="Controls\CueTextBox.cs">
+    <Compile Update="Controls\CueTextBox.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Controls\CueTextBox.Designer.cs">
-      <DependentUpon>CueTextBox.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Controls\NormalizationRule.cs" />
-    <Compile Include="Controls\NormalizeRuleControlContainer.cs">
+    <Compile Update="Controls\NormalizeRuleControlContainer.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="Controls\NormalizeRuleControlContainer.Designer.cs">
-      <DependentUpon>NormalizeRuleControlContainer.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Controls\NormalizeRuleType.cs" />
-    <Compile Include="Extensions.cs" />
-    <Compile Include="Interop\Structures\MeshType.cs" />
-    <Compile Include="Dialogs\Filters.cs" />
-    <Compile Include="FixNormalsSettingsForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="FixNormalsSettingsForm.Designer.cs">
-      <DependentUpon>FixNormalsSettingsForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Interop\CueProvider.cs" />
-    <Compile Include="Interop\Structures\SaveMask.cs" />
-    <Compile Include="LogTextBox.cs">
+    <Compile Update="LogTextBox.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="LogTextBox.Designer.cs">
-      <DependentUpon>LogTextBox.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Controls\NormalizationRuleControl.cs">
+    <Compile Update="Controls\NormalizationRuleControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="Controls\NormalizationRuleControl.Designer.cs">
-      <DependentUpon>NormalizationRuleControl.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Tools\CompareModelsForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Tools\CompareModelsForm.Designer.cs">
-      <DependentUpon>CompareModelsForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Config\ConfigFile.cs" />
-    <Compile Include="Config\ProfilesConfig.cs" />
-    <Compile Include="Defaults.cs" />
-    <Compile Include="EnterNameForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="EnterNameForm.Designer.cs">
-      <DependentUpon>EnterNameForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="ErrorForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="ErrorForm.Designer.cs">
-      <DependentUpon>ErrorForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="GetMappingsForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="GetMappingsForm.Designer.cs">
-      <DependentUpon>GetMappingsForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Interop\ConstWCharPtrMarshaller.cs" />
-    <Compile Include="Interop\Imports.cs" />
-    <Compile Include="Interop\Structures\CompareStatus.cs" />
-    <Compile Include="Interop\Structures\LogLevel.cs" />
-    <Compile Include="Interop\Structures\M2LibError.cs" />
-    <Compile Include="Interop\Structures\Expansion.cs" />
-    <Compile Include="Interop\Structures\Settings.cs" />
-    <Compile Include="M2ModForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="M2ModForm.Designer.cs">
-      <DependentUpon>M2ModForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="ManageProfilesForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="ManageProfilesForm.Designer.cs">
-      <DependentUpon>ManageProfilesForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Config\ProfileManager.cs" />
-    <Compile Include="Config\Configuration.cs" />
-    <Compile Include="Program.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SettingsForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="SettingsForm.Designer.cs">
-      <DependentUpon>SettingsForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Config\SettingsProfile.cs" />
-    <Compile Include="Controls\SplitButton.cs">
+    <Compile Update="Controls\SplitButton.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Controls\SplitButton.Designer.cs">
-      <DependentUpon>SplitButton.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Tools\RemapReferencesForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Tools\RemapReferencesForm.Designer.cs">
-      <DependentUpon>RemapReferencesForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Tools\TXIDRemoverForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Tools\TXIDRemoverForm.Designer.cs">
-      <DependentUpon>TXIDRemoverForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Version.cs" />
-    <EmbeddedResource Include="Controls\NormalizeRuleControlContainer.resx">
-      <DependentUpon>NormalizeRuleControlContainer.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="FixNormalsSettingsForm.resx">
-      <DependentUpon>FixNormalsSettingsForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Controls\NormalizationRuleControl.resx">
-      <DependentUpon>NormalizationRuleControl.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Tools\CompareModelsForm.resx">
-      <DependentUpon>CompareModelsForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="EnterNameForm.resx">
-      <DependentUpon>EnterNameForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="ErrorForm.resx">
-      <DependentUpon>ErrorForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="GetMappingsForm.resx">
-      <DependentUpon>GetMappingsForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="M2ModForm.resx">
-      <DependentUpon>M2ModForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="ManageProfilesForm.resx">
-      <DependentUpon>ManageProfilesForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-    <Compile Include="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Resources.resx</DependentUpon>
-      <DesignTime>True</DesignTime>
-    </Compile>
-    <EmbeddedResource Include="SettingsForm.resx">
-      <DependentUpon>SettingsForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Controls\SplitButton.resx">
-      <DependentUpon>SplitButton.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Tools\RemapReferencesForm.resx">
-      <DependentUpon>RemapReferencesForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Tools\TXIDRemoverForm.resx">
-      <DependentUpon>TXIDRemoverForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <None Include="packages.config" />
-    <None Include="Properties\Settings.settings">
-      <Generator>SettingsSingleFileGenerator</Generator>
-      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
-    </None>
-    <Compile Include="Properties\Settings.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Settings.settings</DependentUpon>
-      <DesignTimeSharedInput>True</DesignTimeSharedInput>
-    </Compile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Icon.ico" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="app.ico" />
   </ItemGroup>
-  <ItemGroup />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="..\packages\Fody.6.0.0\build\Fody.targets" Condition="Exists('..\packages\Fody.6.0.0\build\Fody.targets')" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Fody.6.0.0\build\Fody.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Fody.6.0.0\build\Fody.targets'))" />
-    <Error Condition="!Exists('..\packages\Costura.Fody.4.1.0\build\Costura.Fody.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Costura.Fody.4.1.0\build\Costura.Fody.props'))" />
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="echo %25date%25 %25time%25 &gt; &quot;$(ProjectDir)\Resources\BuildDate.txt&quot;" />
   </Target>
 </Project>

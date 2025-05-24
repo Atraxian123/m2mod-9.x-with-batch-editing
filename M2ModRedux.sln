@@ -5,11 +5,6 @@ VisualStudioVersion = 16.0.29102.190
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "M2Lib", "M2Lib\M2Lib.vcxproj", "{881DD3B6-0C01-44BA-86A4-09C9ADC86ECB}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "M2ModRedux", "M2ModRedux\M2ModRedux.vcxproj", "{E0F7E43B-73C9-4537-8B78-2BC30DD50038}"
-	ProjectSection(ProjectDependencies) = postProject
-		{881DD3B6-0C01-44BA-86A4-09C9ADC86ECB} = {881DD3B6-0C01-44BA-86A4-09C9ADC86ECB}
-	EndProjectSection
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{CA446F65-5048-4B88-8874-19D021160247}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
@@ -45,18 +40,7 @@ Global
 		{881DD3B6-0C01-44BA-86A4-09C9ADC86ECB}.Release|Win32.ActiveCfg = Release|Win32
 		{881DD3B6-0C01-44BA-86A4-09C9ADC86ECB}.Release|Win32.Build.0 = Release|Win32
 		{881DD3B6-0C01-44BA-86A4-09C9ADC86ECB}.Release|x64.ActiveCfg = Release|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Debug Shared|Any CPU.ActiveCfg = Debug Shared|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Debug Shared|Win32.ActiveCfg = Debug Shared|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Debug Shared|Win32.Build.0 = Debug Shared|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Debug Shared|x64.ActiveCfg = Debug Shared|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Debug|Any CPU.ActiveCfg = Debug|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Debug|Win32.ActiveCfg = Debug|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Debug|Win32.Build.0 = Debug|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Debug|x64.ActiveCfg = Debug|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Release|Any CPU.ActiveCfg = Release|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Release|Win32.ActiveCfg = Release|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Release|Win32.Build.0 = Release|Win32
-		{E0F7E43B-73C9-4537-8B78-2BC30DD50038}.Release|x64.ActiveCfg = Release|Win32
+		{881DD3B6-0C01-44BA-86A4-09C9ADC86ECB}.Debug|Any CPU.Build.0 = Debug|Win32
 		{804C5F6F-D8A8-45C0-BAD6-A52E7B69049F}.Debug Shared|Any CPU.ActiveCfg = Debug Shared|Any CPU
 		{804C5F6F-D8A8-45C0-BAD6-A52E7B69049F}.Debug Shared|Any CPU.Build.0 = Debug Shared|Any CPU
 		{804C5F6F-D8A8-45C0-BAD6-A52E7B69049F}.Debug Shared|Win32.ActiveCfg = Debug Shared|Any CPU

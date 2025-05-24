@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -28,9 +29,7 @@ namespace M2Mod
 
             this.Icon = Properties.Resources.Icon;
 
-            var assemblyVersion = Assembly.GetExecutingAssembly().GetName().Version;
-            var buildDate = (new DateTime(2000, 1, 1)).AddDays(assemblyVersion.Build)
-                .AddSeconds(assemblyVersion.Revision * 2);
+            var buildDate = Encoding.UTF8.GetString(Properties.Resources.BuildDate).Replace(" ", " ").Trim();
 
             Text = $"M2Mod {VersionString} built at {buildDate}";
 
