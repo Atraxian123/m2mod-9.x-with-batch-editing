@@ -16,11 +16,9 @@ namespace M2Mod
         }
 
         [Category(Category)]
-        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public bool InlcudeTimestamp { get; set; } = true;
 
         [Category(Category)]
-        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         public bool UseColors { get; set; } = true;
 
         public void AppendLine(LogLevel logLevel, string message)

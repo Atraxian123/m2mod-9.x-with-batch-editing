@@ -69,17 +69,5 @@ namespace M2Mod.Properties {
                 return ((System.Drawing.Icon)(obj));
             }
         }
-
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[] similar to (BuildDate).
-        /// </summary>
-        internal static System.Byte[] BuildDate
-        {
-            get
-            {
-                object obj = ResourceManager.GetObject("BuildDate", resourceCulture);
-                return ((System.Byte[])(obj));
-            }
-        }
     }
 }
