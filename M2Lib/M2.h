@@ -26,6 +26,7 @@ namespace M2Lib
 	namespace SkeletonChunk
 	{
 		class AFIDChunk;
+		class SKS1Chunk;
 	}
 
 	enum SaveFlags
@@ -326,6 +327,11 @@ namespace M2Lib
 		SkeletonChunk::AFIDChunk* GetSkeletonAFIDChunk();
 
 	private:
+		// picks the SKS1 chunk (child or parent) whose Animation +
+		// AnimationLookup should be treated as an atomic pair - see
+		// implementation comment for why these can't be sourced independently.
+		SkeletonChunk::SKS1Chunk* m_GetAuthoritativeSequenceChunk();
+
 		// utilities and tests
 
 		// averages normals of duplicate vertices within submeshes.

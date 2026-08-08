@@ -2130,15 +2130,49 @@ void M2Lib::M2::m_LoadElements_FindSizes(uint32_t ChunkSize)
 #define VERIFY_OFFSET_NOTLOCAL( offset ) \
 	m2lib_assert( !offset || offset >= Elements[iElement].OffsetOriginal + Elements[iElement].Data.size() );
 
+// Returns the SKS1 chunk that should be treated as authoritative for BOTH
+// GetAnimations() and GetAnimationsLookup(). These two MUST always be sourced
+// from the same skeleton (child or parent) - AnimationLookup values are
+// indices into that skeleton's OWN Animation array, not a global index space.
+// Picking Animations from one skeleton and AnimationLookup from another would
+// silently produce out-of-bounds/garbage sequence indices.
+//
+// Verified against a real child/parent pair (centaur2_female.skel ->
+// centaur2_male.skel): child has Animation.Count=5 (her own real sequences)
+// but AnimationLookup.Count=0 - i.e. she cannot resolve ANY animation ID to a
+// sequence index on her own. In that case we must defer entirely to the
+// parent for sequence resolution (both Animation AND AnimationLookup),
+// rather than mixing child sequences with parent lookup indices.
+M2Lib::SkeletonChunk::SKS1Chunk* M2Lib::M2::m_GetAuthoritativeSequenceChunk()
+{
+	using namespace SkeletonChunk;
+
+	if (auto chunk = Skeleton ? (SKS1Chunk*)Skeleton->GetChunk(ESkeletonChunk::SKS1) : NULL)
+		if (chunk->Elements[SKS1Chunk::EElement_AnimationLookup].Count > 0)
+			return chunk; // child can self-resolve animation IDs - use it as-is
+
+	if (auto chunk = ParentSkeleton ? (SKS1Chunk*)ParentSkeleton->GetChunk(ESkeletonChunk::SKS1) : NULL)
+		if (chunk->Elements[SKS1Chunk::EElement_AnimationLookup].Count > 0)
+			return chunk; // child's lookup is empty/deficient - defer to parent entirely
+
+	// neither has a usable lookup table; fall back to whichever SKS1 chunk
+	// exists at all (child preferred) so callers still get *something*
+	// rather than nothing, consistent with prior behavior.
+	if (auto chunk = Skeleton ? (SKS1Chunk*)Skeleton->GetChunk(ESkeletonChunk::SKS1) : NULL)
+		return chunk;
+	if (auto chunk = ParentSkeleton ? (SKS1Chunk*)ParentSkeleton->GetChunk(ESkeletonChunk::SKS1) : NULL)
+		return chunk;
+
+	return NULL;
+}
+
 M2Lib::DataElement* M2Lib::M2::GetAnimations()
 {
 	using namespace SkeletonChunk;
 
-	if (auto animationChunk = Skeleton ? (SKS1Chunk*)Skeleton->GetChunk(ESkeletonChunk::SKS1) : NULL)
+	if (auto animationChunk = m_GetAuthoritativeSequenceChunk())
 		return &animationChunk->Elements[SKS1Chunk::EElement_Animation];
-	if (auto animationChunk = ParentSkeleton ? (SKS1Chunk*)ParentSkeleton->GetChunk(ESkeletonChunk::SKS1) : NULL)
-		return &animationChunk->Elements[SKS1Chunk::EElement_Animation];
-		
+
 	return &Elements[EElement_Animation];
 }
 
@@ -2146,9 +2180,7 @@ M2Lib::DataElement* M2Lib::M2::GetAnimationsLookup()
 {
 	using namespace SkeletonChunk;
 
-	if (auto animationChunk = Skeleton ? (SKS1Chunk*)Skeleton->GetChunk(ESkeletonChunk::SKS1) : NULL)
-		return &animationChunk->Elements[SKS1Chunk::EElement_AnimationLookup];
-	if (auto animationChunk = ParentSkeleton ? (SKS1Chunk*)ParentSkeleton->GetChunk(ESkeletonChunk::SKS1) : NULL)
+	if (auto animationChunk = m_GetAuthoritativeSequenceChunk())
 		return &animationChunk->Elements[SKS1Chunk::EElement_AnimationLookup];
 
 	return &Elements[EElement_Animation];
