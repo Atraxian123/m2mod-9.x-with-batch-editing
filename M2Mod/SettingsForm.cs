@@ -61,6 +61,7 @@ namespace M2Mod
             checkBoxIgnoreOriginalMeshIndexes.Checked = settings.IgnoreOriginalMeshIndexes;
             testFixAnimationsCheckBox.Checked = settings.FixAnimationsTest;
             customFilesStartIndexTextBox.Text = settings.CustomFilesStartIndex > 0 ? settings.CustomFilesStartIndex.ToString() : "0";
+            checkBoxUseFallbackSkinNaming.Checked = settings.UseFallbackSkinNaming;
 
             normalizationConfig = profile.Configuration.NormalizationConfig;
         }
@@ -84,7 +85,8 @@ namespace M2Mod
                 IgnoreOriginalMeshIndexes = checkBoxIgnoreOriginalMeshIndexes.Checked,
                 FixAnimationsTest = testFixAnimationsCheckBox.Checked,
                 ForceLoadExpansion = forceExpansionComboBox.SelectedItem as Expansion? ?? Expansion.None,
-                CustomFilesStartIndex = customFilesStartIndex
+                CustomFilesStartIndex = customFilesStartIndex,
+                UseFallbackSkinNaming = checkBoxUseFallbackSkinNaming.Checked
             };
         }
 
@@ -216,6 +218,7 @@ namespace M2Mod
                 old.Settings.FixAnimationsTest != New.FixAnimationsTest ||
                 old.Settings.ForceLoadExpansion != New.ForceLoadExpansion ||
                 old.Settings.CustomFilesStartIndex != New.CustomFilesStartIndex ||
+                old.Settings.UseFallbackSkinNaming != New.UseFallbackSkinNaming ||
                 normalizationConfigChanged;
         }
 

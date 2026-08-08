@@ -21,6 +21,13 @@ namespace M2Lib
 		bool IgnoreOriginalMeshIndexes = false;
 		bool FixAnimationsTest = false;
 
+		// When true, .skin file names are always derived from the classic
+		// "<model>0N.skin" / "<model>_LOD0N.skin" naming convention, even if the
+		// model has an SFID chunk and a listfile entry is available for its
+		// FileDataId. When false (default), the retail FileDataId/listfile
+		// lookup is tried first and this convention is only used as a fallback.
+		bool UseFallbackSkinNaming = false;
+
 		void setOutputDirectory(const wchar_t* directory);
 		void setWorkingDirectory(const wchar_t* directory);
 		void setMappingsDirectory(const wchar_t* directory);
@@ -35,6 +42,6 @@ namespace M2Lib
 		void operator=(Settings const& other);
 	};
 
-	ASSERT_SIZE(Settings, 1024 * 2 * 2 + sizeof(wchar_t) * 1024 + 4 + 7 + 4);
+	ASSERT_SIZE(Settings, 1024 * 2 * 2 + sizeof(wchar_t) * 1024 + 4 + 7 + 4 + 1);
 #pragma pack(pop)
 }

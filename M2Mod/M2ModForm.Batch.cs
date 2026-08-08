@@ -20,6 +20,7 @@ namespace M2Mod
         private CheckBox checkBoxBatchRemoveTxid;
         private CheckBox checkBoxBatchFixLodSkins;
         private CheckBox checkBoxBatchLegacySuffix;
+        private CheckBox checkBoxBatchSkipConversion;
         private Button buttonBatchStart;
         private ProgressBar progressBarBatch;
         private Label labelBatchStatus;
@@ -31,7 +32,7 @@ namespace M2Mod
             tabBatch = new TabPage
             {
                 Name = "tabBatch",
-                Text = "Batch M2I Round-trip",
+                Text = "Batch",
                 UseVisualStyleBackColor = true,
                 Padding = new Padding(3)
             };
@@ -87,17 +88,25 @@ namespace M2Mod
                 Location = new System.Drawing.Point(10, 134)
             };
 
+            checkBoxBatchSkipConversion = new CheckBox
+            {
+                Text = "Skip M2 <-> M2I conversion (only apply the operations checked above, e.g. TXID/suffix/LOD fixing)",
+                AutoSize = true,
+                Location = new System.Drawing.Point(10, 157)
+            };
+            checkBoxBatchSkipConversion.CheckedChanged += CheckBoxBatchSkipConversion_CheckedChanged;
+
             buttonBatchStart = new Button
             {
                 Text = "Start",
-                Location = new System.Drawing.Point(10, 161),
+                Location = new System.Drawing.Point(10, 187),
                 Size = new System.Drawing.Size(120, 28)
             };
             buttonBatchStart.Click += ButtonBatchStart_Click;
 
             progressBarBatch = new ProgressBar
             {
-                Location = new System.Drawing.Point(10, 201),
+                Location = new System.Drawing.Point(10, 227),
                 Size = new System.Drawing.Size(536, 20),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 Minimum = 0,
@@ -109,7 +118,7 @@ namespace M2Mod
             {
                 Text = "",
                 AutoSize = true,
-                Location = new System.Drawing.Point(10, 226),
+                Location = new System.Drawing.Point(10, 252),
                 Size = new System.Drawing.Size(536, 40),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -121,11 +130,22 @@ namespace M2Mod
             tabBatch.Controls.Add(checkBoxBatchRemoveTxid);
             tabBatch.Controls.Add(checkBoxBatchFixLodSkins);
             tabBatch.Controls.Add(checkBoxBatchLegacySuffix);
+            tabBatch.Controls.Add(checkBoxBatchSkipConversion);
             tabBatch.Controls.Add(buttonBatchStart);
             tabBatch.Controls.Add(progressBarBatch);
             tabBatch.Controls.Add(labelBatchStatus);
 
             tabControl.Controls.Add(tabBatch);
+        }
+
+        private void CheckBoxBatchSkipConversion_CheckedChanged(object sender, EventArgs e)
+        {
+            // When the round-trip conversion is skipped, TXID removal still needs a native
+            // load/save pass, but it's the only remaining reason to touch M2Lib at all - so
+            // make that dependency visible in the label instead of silently no-oping.
+            checkBoxBatchRemoveTxid.Text = checkBoxBatchSkipConversion.Checked
+                ? "Remove TXID chunk (still requires a load/save pass)"
+                : "Remove TXID chunk";
         }
 
         private void ButtonBatchBrowse_Click(object sender, EventArgs e)
@@ -168,10 +188,18 @@ namespace M2Mod
                 return;
             }
 
+            var skipConversion = checkBoxBatchSkipConversion.Checked;
+
+            var confirmText = skipConversion
+                ? $"This will process {files.Length} .m2 file(s) in place using only the operations " +
+                  "checked above (no M2 <-> M2I conversion will be performed). This cannot be undone " +
+                  "(unless you have backups). Continue?"
+                : $"This will convert {files.Length} .m2 file(s) to .m2i and back, overwriting each " +
+                  "original file in place. This cannot be undone (unless you have backups). Continue?";
+
             var confirm = MessageBox.Show(
-                $"This will convert {files.Length} .m2 file(s) to .m2i and back, overwriting each " +
-                "original file in place. This cannot be undone (unless you have backups). Continue?",
-                "Confirm batch round-trip",
+                confirmText,
+                "Confirm batch operation",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
             if (confirm != DialogResult.Yes)
@@ -204,10 +232,12 @@ namespace M2Mod
             checkBoxBatchRemoveTxid.Enabled = false;
             checkBoxBatchFixLodSkins.Enabled = false;
             checkBoxBatchLegacySuffix.Enabled = false;
+            checkBoxBatchSkipConversion.Enabled = false;
 
             var removeTxid = checkBoxBatchRemoveTxid.Checked;
             var fixLodSkins = checkBoxBatchFixLodSkins.Checked;
             var legacySuffix = checkBoxBatchLegacySuffix.Checked;
+            var skipConversion = checkBoxBatchSkipConversion.Checked;
 
             progressBarBatch.Minimum = 0;
             progressBarBatch.Maximum = files.Length;
@@ -223,16 +253,18 @@ namespace M2Mod
                     var file = originalFile;
 
                     labelBatchStatus.Text = $"[{succeeded + failed + 1}/{files.Length}] {Path.GetFileName(file)}";
-                    SetStatus($"Converting {Path.GetFileName(file)}...");
+                    SetStatus(skipConversion
+                        ? $"Processing {Path.GetFileName(file)}..."
+                        : $"Converting {Path.GetFileName(file)}...");
                     labelBatchStatus.Refresh();
                     statusStrip1.Refresh();
 
-                    var error = ConvertM2ToM2AndBack(file, removeTxid);
+                    var error = ProcessFile(file, removeTxid, skipConversion);
                     if (error != M2LibError.OK)
                     {
                         failed++;
                         logTextBox.AppendLine(LogLevel.Error,
-                            $"Failed to round-trip '{file}': {Imports.GetErrorText(error)}. Skipping to next file.");
+                            $"Failed to process '{file}': {Imports.GetErrorText(error)}. Skipping to next file.");
                     }
                     else
                     {
@@ -248,7 +280,7 @@ namespace M2Mod
                             catch (Exception lodEx)
                             {
                                 logTextBox.AppendLine(LogLevel.Warning,
-                                    $"Converted '{file}' successfully but failed to fold its LOD skins: {lodEx.Message}");
+                                    $"Processed '{file}' successfully but failed to fold its LOD skins: {lodEx.Message}");
                             }
                         }
 
@@ -267,7 +299,7 @@ namespace M2Mod
                             catch (Exception suffixEx)
                             {
                                 logTextBox.AppendLine(LogLevel.Warning,
-                                    $"Converted '{file}' successfully but failed to rename its race/gender suffix: {suffixEx.Message}");
+                                    $"Processed '{file}' successfully but failed to rename its race/gender suffix: {suffixEx.Message}");
                             }
                         }
 
@@ -278,7 +310,7 @@ namespace M2Mod
                         catch (Exception moveEx)
                         {
                             logTextBox.AppendLine(LogLevel.Warning,
-                                $"Converted '{file}' successfully but failed to move it to the Done folder: {moveEx.Message}");
+                                $"Processed '{file}' successfully but failed to move it to the Done folder: {moveEx.Message}");
                         }
 
                         succeeded++;
@@ -304,14 +336,15 @@ namespace M2Mod
                 checkBoxBatchRemoveTxid.Enabled = true;
                 checkBoxBatchFixLodSkins.Enabled = true;
                 checkBoxBatchLegacySuffix.Enabled = true;
+                checkBoxBatchSkipConversion.Enabled = true;
 
                 _batchRunning = false;
             }
 
             labelBatchStatus.Text = $"Done. {succeeded} succeeded, {failed} failed out of {files.Length}.";
-            SetStatus("Batch round-trip finished.");
+            SetStatus("Batch operation finished.");
 
-            MessageBox.Show(labelBatchStatus.Text, "Batch round-trip finished",
+            MessageBox.Show(labelBatchStatus.Text, "Batch operation finished",
                 MessageBoxButtons.OK, failed > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
         }
 
@@ -508,6 +541,57 @@ namespace M2Mod
                 File.Delete(destination);
 
             File.Move(filePath, destination);
+        }
+
+        /// <summary>
+        /// Dispatches a single file to either the full M2 -&gt; M2I -&gt; M2 round-trip, or - when
+        /// <paramref name="skipConversion"/> is set - a lighter-weight path that leaves the mesh
+        /// data completely untouched. This is what lets the batch tab double as a mass TXID
+        /// fixer or a plain suffix/LOD-skin converter without forcing every file through a full
+        /// conversion it doesn't need.
+        /// </summary>
+        private M2LibError ProcessFile(string m2FilePath, bool removeTxidChunk, bool skipConversion)
+        {
+            if (!skipConversion)
+                return ConvertM2ToM2AndBack(m2FilePath, removeTxidChunk);
+
+            // Conversion skipped: only touch M2Lib at all if there's actually a TXID chunk to
+            // remove. If not, this file needs no native load/save - the remaining batch
+            // operations (LOD folding, suffix renaming, moving to Done) all work directly on
+            // the file on disk and are applied by the caller regardless of this return value.
+            return removeTxidChunk
+                ? RemoveTxidChunkOnly(m2FilePath)
+                : M2LibError.OK;
+        }
+
+        /// <summary>
+        /// Loads a single .m2 (no .m2i round-trip), flags its TXID chunk for removal, and saves
+        /// it straight back over the original file. Used when the batch tab's "Skip M2 &lt;-&gt; M2I
+        /// conversion" option is checked, so TXID stripping alone doesn't require a full
+        /// export/import cycle.
+        /// </summary>
+        private M2LibError RemoveTxidChunkOnly(string m2FilePath)
+        {
+            IntPtr m2 = IntPtr.Zero;
+            try
+            {
+                m2 = Imports.M2_Create(ref ProfileManager.CurrentProfile.Settings);
+
+                var error = Imports.M2_Load(m2, m2FilePath);
+                if (error != M2LibError.OK)
+                    return error;
+
+                error = Imports.M2_SetNeedRemoveTXIDChunk(m2);
+                if (error != M2LibError.OK)
+                    return error;
+
+                return Imports.M2_Save(m2, m2FilePath, SaveMask.All);
+            }
+            finally
+            {
+                if (m2 != IntPtr.Zero)
+                    Imports.M2_Free(m2);
+            }
         }
 
         /// <summary>

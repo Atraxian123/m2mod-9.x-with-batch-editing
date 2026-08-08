@@ -29,5 +29,14 @@ namespace M2Mod.Interop.Structures
         [MarshalAs(UnmanagedType.U1)] public bool FixEdgeNormals;
         [MarshalAs(UnmanagedType.U1)] public bool IgnoreOriginalMeshIndexes;
         [MarshalAs(UnmanagedType.U1)] public bool FixAnimationsTest;
+
+        /// <summary>
+        /// When true, .skin file names are always derived from the classic
+        /// "&lt;model&gt;0N.skin" / "&lt;model&gt;_LOD0N.skin" naming convention, even if the
+        /// model has an SFID chunk and a listfile entry is available for its FileDataId.
+        /// When false (default), the retail FileDataId/listfile lookup is tried first and
+        /// this convention is only used as a fallback.
+        /// </summary>
+        [MarshalAs(UnmanagedType.U1)] public bool UseFallbackSkinNaming;
     }
 }

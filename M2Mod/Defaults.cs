@@ -19,6 +19,7 @@ namespace M2Mod
             IgnoreOriginalMeshIndexes = false,
             FixAnimationsTest = false,
             CustomFilesStartIndex = 0,
+            UseFallbackSkinNaming = false,
         };
 
         public static SettingsProfile SettingsProfile => new SettingsProfile("Default", Settings, new Configuration());

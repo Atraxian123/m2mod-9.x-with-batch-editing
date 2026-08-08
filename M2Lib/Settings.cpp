@@ -30,4 +30,5 @@ void M2Lib::Settings::operator=(Settings const& other)
 	IgnoreOriginalMeshIndexes = other.IgnoreOriginalMeshIndexes;
 	FixAnimationsTest = other.FixAnimationsTest;
 	CustomFilesStartIndex = other.CustomFilesStartIndex;
+	UseFallbackSkinNaming = other.UseFallbackSkinNaming;
 }

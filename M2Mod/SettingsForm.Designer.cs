@@ -57,6 +57,7 @@
             this.profilesLabel = new System.Windows.Forms.Label();
             this.editProfilesButton = new System.Windows.Forms.Button();
             this.buttonEdgeConfigure = new System.Windows.Forms.Button();
+            this.checkBoxUseFallbackSkinNaming = new System.Windows.Forms.CheckBox();
             this.outputDirectoryGroupBox.SuspendLayout();
             this.workingDirectoryGroupBox.SuspendLayout();
             this.mappingsDirectoryGroupBox.SuspendLayout();
@@ -274,7 +275,7 @@
             // saveButton
             // 
             this.saveButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.saveButton.Location = new System.Drawing.Point(151, 404);
+            this.saveButton.Location = new System.Drawing.Point(151, 427);
             this.saveButton.Name = "saveButton";
             this.saveButton.Size = new System.Drawing.Size(81, 29);
             this.saveButton.TabIndex = 27;
@@ -293,7 +294,7 @@
             this.groupBox3.Controls.Add(this.checkBoxMergeCameras);
             this.groupBox3.Controls.Add(this.checkBoxMergeAttachments);
             this.groupBox3.Controls.Add(this.checkBoxMergeBones);
-            this.groupBox3.Location = new System.Drawing.Point(12, 306);
+            this.groupBox3.Location = new System.Drawing.Point(12, 329);
             this.groupBox3.Name = "groupBox3";
             this.groupBox3.Size = new System.Drawing.Size(307, 90);
             this.groupBox3.TabIndex = 26;
@@ -311,7 +312,7 @@
             // closeButton
             // 
             this.closeButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.closeButton.Location = new System.Drawing.Point(238, 404);
+            this.closeButton.Location = new System.Drawing.Point(238, 427);
             this.closeButton.Name = "closeButton";
             this.closeButton.Size = new System.Drawing.Size(81, 29);
             this.closeButton.TabIndex = 28;
@@ -325,12 +326,27 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.groupBox1.Controls.Add(this.label1);
             this.groupBox1.Controls.Add(this.forceExpansionComboBox);
+            this.groupBox1.Controls.Add(this.checkBoxUseFallbackSkinNaming);
             this.groupBox1.Location = new System.Drawing.Point(12, 251);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(307, 53);
+            this.groupBox1.Size = new System.Drawing.Size(307, 76);
             this.groupBox1.TabIndex = 25;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Export Settings";
+            // 
+            // checkBoxUseFallbackSkinNaming
+            // 
+            this.checkBoxUseFallbackSkinNaming.AutoSize = true;
+            this.checkBoxUseFallbackSkinNaming.Location = new System.Drawing.Point(9, 45);
+            this.checkBoxUseFallbackSkinNaming.Name = "checkBoxUseFallbackSkinNaming";
+            this.checkBoxUseFallbackSkinNaming.Size = new System.Drawing.Size(275, 17);
+            this.checkBoxUseFallbackSkinNaming.TabIndex = 24;
+            this.checkBoxUseFallbackSkinNaming.Text = "Force fallback .skin naming (ignore FileDataId/listfile)";
+            this.toolTip1.SetToolTip(this.checkBoxUseFallbackSkinNaming, "Retail (default, unchecked): look up .skin files by FileDataId via the listfile" +
+        " first, falling back to \'<model>0N.skin\' / \'<model>_LOD0N.skin\' only if that f" +
+        "ails.\r\nFallback (checked): always use the classic \'<model>0N.skin\' / \'<model>_" +
+        "LOD0N.skin\' naming convention, even for chunked models with an SFID chunk.");
+            this.checkBoxUseFallbackSkinNaming.UseVisualStyleBackColor = true;
             // 
             // profilesComboBox
             // 
@@ -380,7 +396,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(331, 439);
+            this.ClientSize = new System.Drawing.Size(331, 462);
             this.Controls.Add(this.mappingsDirectoryGroupBox);
             this.Controls.Add(this.editProfilesButton);
             this.Controls.Add(this.profilesLabel);
@@ -391,7 +407,7 @@
             this.Controls.Add(this.groupBox3);
             this.Controls.Add(this.closeButton);
             this.Controls.Add(this.groupBox1);
-            this.MinimumSize = new System.Drawing.Size(347, 478);
+            this.MinimumSize = new System.Drawing.Size(347, 501);
             this.Name = "SettingsForm";
             this.Text = "Settings";
             this.outputDirectoryGroupBox.ResumeLayout(false);
@@ -437,5 +453,6 @@
         private System.Windows.Forms.Label customFilesStartIndexLabel;
         private System.Windows.Forms.TextBox customFilesStartIndexTextBox;
         private System.Windows.Forms.Button buttonEdgeConfigure;
+        private System.Windows.Forms.CheckBox checkBoxUseFallbackSkinNaming;
     }
 }

@@ -1854,11 +1854,18 @@ void M2Lib::M2::CopyRemappedFiles(const wchar_t* m2FileName)
 // Gets the .skin file names.
 bool M2Lib::M2::GetFileSkin(std::wstring& SkinFileNameResultBuffer, std::wstring const& M2FileName, uint32_t SkinIndex, bool Save)
 {
-	M2Chunk::SFIDChunk* skinChunk;
-	if (Save && replaceM2)
-		skinChunk = (M2Chunk::SFIDChunk*)replaceM2->GetChunk(EM2Chunk::Skin);
+	M2Chunk::SFIDChunk* skinChunk = nullptr;
+	if (!Settings.UseFallbackSkinNaming)
+	{
+		if (Save && replaceM2)
+			skinChunk = (M2Chunk::SFIDChunk*)replaceM2->GetChunk(EM2Chunk::Skin);
+		else
+			skinChunk = (M2Chunk::SFIDChunk*)GetChunk(EM2Chunk::Skin);
+	}
 	else
-		skinChunk = (M2Chunk::SFIDChunk*)GetChunk(EM2Chunk::Skin);
+	{
+		sLogger.LogInfo(L"Fallback skin naming forced by settings; skipping FileDataId/listfile lookup for skin #%u", SkinIndex);
+	}
 
 	if (skinChunk)
 	{
