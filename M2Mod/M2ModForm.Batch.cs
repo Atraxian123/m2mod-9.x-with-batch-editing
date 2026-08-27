@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -21,6 +22,8 @@ namespace M2Mod
         private CheckBox checkBoxBatchFixLodSkins;
         private CheckBox checkBoxBatchLegacySuffix;
         private CheckBox checkBoxBatchSkipConversion;
+        private CheckBox checkBoxBatchMirrorRootDone;
+        private CheckBox checkBoxBatchCopyTextures;
         private Button buttonBatchStart;
         private ProgressBar progressBarBatch;
         private Label labelBatchStatus;
@@ -44,18 +47,32 @@ namespace M2Mod
                 Location = new System.Drawing.Point(10, 15)
             };
 
+            const int leftMargin = 10;
+            const int rightMargin = 10;
+            const int browseButtonWidth = 100;
+            const int browseButtonGap = 6;
+
+            // Compute widths from the tab's own client width (rather than a hardcoded pixel
+            // value tuned for one specific window size) so the folder textbox and the progress
+            // bar correctly fill the available space regardless of how wide the window actually
+            // is. The Anchor settings below then keep them filling that space as the window is
+            // resized afterwards.
+            var tabContentWidth = tabBatch.ClientSize.Width > 0 ? tabBatch.ClientSize.Width : 568;
+
             textBoxBatchFolder = new TextBox
             {
-                Location = new System.Drawing.Point(10, 35),
-                Size = new System.Drawing.Size(430, 20),
+                Location = new System.Drawing.Point(leftMargin, 35),
+                Size = new System.Drawing.Size(
+                    Math.Max(50, tabContentWidth - leftMargin - browseButtonWidth - browseButtonGap - rightMargin),
+                    20),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
 
             buttonBatchBrowse = new Button
             {
                 Text = "Browse...",
-                Location = new System.Drawing.Point(446, 33),
-                Size = new System.Drawing.Size(100, 24),
+                Location = new System.Drawing.Point(tabContentWidth - rightMargin - browseButtonWidth, 33),
+                Size = new System.Drawing.Size(browseButtonWidth, 24),
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             buttonBatchBrowse.Click += ButtonBatchBrowse_Click;
@@ -96,18 +113,34 @@ namespace M2Mod
             };
             checkBoxBatchSkipConversion.CheckedChanged += CheckBoxBatchSkipConversion_CheckedChanged;
 
+            checkBoxBatchMirrorRootDone = new CheckBox
+            {
+                Text = "Collect processed files into a mirrored \"<root folder>_done\" tree instead of per-folder \"Done\" subfolders",
+                AutoSize = true,
+                Location = new System.Drawing.Point(10, 180)
+            };
+            checkBoxBatchMirrorRootDone.CheckedChanged += CheckBoxBatchMirrorRootDone_CheckedChanged;
+
+            checkBoxBatchCopyTextures = new CheckBox
+            {
+                Text = "Also copy all .blp textures under the root folder into the mirrored tree",
+                AutoSize = true,
+                Location = new System.Drawing.Point(28, 203),
+                Enabled = false
+            };
+
             buttonBatchStart = new Button
             {
                 Text = "Start",
-                Location = new System.Drawing.Point(10, 187),
+                Location = new System.Drawing.Point(10, 233),
                 Size = new System.Drawing.Size(120, 28)
             };
             buttonBatchStart.Click += ButtonBatchStart_Click;
 
             progressBarBatch = new ProgressBar
             {
-                Location = new System.Drawing.Point(10, 227),
-                Size = new System.Drawing.Size(536, 20),
+                Location = new System.Drawing.Point(leftMargin, 273),
+                Size = new System.Drawing.Size(tabContentWidth - leftMargin - rightMargin, 20),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 Minimum = 0,
                 Maximum = 1,
@@ -118,8 +151,8 @@ namespace M2Mod
             {
                 Text = "",
                 AutoSize = true,
-                Location = new System.Drawing.Point(10, 252),
-                Size = new System.Drawing.Size(536, 40),
+                Location = new System.Drawing.Point(leftMargin, 298),
+                Size = new System.Drawing.Size(tabContentWidth - leftMargin - rightMargin, 40),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
 
@@ -131,11 +164,21 @@ namespace M2Mod
             tabBatch.Controls.Add(checkBoxBatchFixLodSkins);
             tabBatch.Controls.Add(checkBoxBatchLegacySuffix);
             tabBatch.Controls.Add(checkBoxBatchSkipConversion);
+            tabBatch.Controls.Add(checkBoxBatchMirrorRootDone);
+            tabBatch.Controls.Add(checkBoxBatchCopyTextures);
             tabBatch.Controls.Add(buttonBatchStart);
             tabBatch.Controls.Add(progressBarBatch);
             tabBatch.Controls.Add(labelBatchStatus);
 
             tabControl.Controls.Add(tabBatch);
+        }
+
+        private void CheckBoxBatchMirrorRootDone_CheckedChanged(object sender, EventArgs e)
+        {
+            // Texture copying only makes sense together with the mirrored done tree - disable
+            // (without clearing) the checkbox otherwise, so the user's preference is remembered
+            // if they toggle mirroring back on later.
+            checkBoxBatchCopyTextures.Enabled = checkBoxBatchMirrorRootDone.Checked;
         }
 
         private void CheckBoxBatchSkipConversion_CheckedChanged(object sender, EventArgs e)
@@ -205,7 +248,7 @@ namespace M2Mod
             if (confirm != DialogResult.Yes)
                 return;
 
-            RunBatchRoundTrip(files);
+            RunBatchRoundTrip(files, folder);
         }
 
         private static bool IsInsideDoneFolder(string filePath)
@@ -214,7 +257,7 @@ namespace M2Mod
             return string.Equals(directoryName, "Done", StringComparison.OrdinalIgnoreCase);
         }
 
-        private void RunBatchRoundTrip(string[] files)
+        private void RunBatchRoundTrip(string[] files, string rootFolder)
         {
             _batchRunning = true;
 
@@ -233,11 +276,22 @@ namespace M2Mod
             checkBoxBatchFixLodSkins.Enabled = false;
             checkBoxBatchLegacySuffix.Enabled = false;
             checkBoxBatchSkipConversion.Enabled = false;
+            checkBoxBatchMirrorRootDone.Enabled = false;
+            checkBoxBatchCopyTextures.Enabled = false;
 
             var removeTxid = checkBoxBatchRemoveTxid.Checked;
             var fixLodSkins = checkBoxBatchFixLodSkins.Checked;
             var legacySuffix = checkBoxBatchLegacySuffix.Checked;
             var skipConversion = checkBoxBatchSkipConversion.Checked;
+            var mirrorRootDone = checkBoxBatchMirrorRootDone.Checked;
+            var copyTextures = mirrorRootDone && checkBoxBatchCopyTextures.Checked;
+
+            if (copyTextures)
+            {
+                SetStatus("Copying .blp textures...");
+                statusStrip1.Refresh();
+                CopyAllTexturesToMirroredDone(rootFolder);
+            }
 
             progressBarBatch.Minimum = 0;
             progressBarBatch.Maximum = files.Length;
@@ -305,7 +359,10 @@ namespace M2Mod
 
                         try
                         {
-                            MoveToDoneFolder(file);
+                            if (mirrorRootDone)
+                                MoveToMirroredDoneFolder(file, rootFolder);
+                            else
+                                MoveToDoneFolder(file);
                         }
                         catch (Exception moveEx)
                         {
@@ -337,6 +394,8 @@ namespace M2Mod
                 checkBoxBatchFixLodSkins.Enabled = true;
                 checkBoxBatchLegacySuffix.Enabled = true;
                 checkBoxBatchSkipConversion.Enabled = true;
+                checkBoxBatchMirrorRootDone.Enabled = true;
+                checkBoxBatchCopyTextures.Enabled = checkBoxBatchMirrorRootDone.Checked;
 
                 _batchRunning = false;
             }
@@ -476,6 +535,41 @@ namespace M2Mod
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         /// <summary>
+        /// True siblings of a given .m2 stem follow one of exactly three patterns after the stem:
+        /// nothing at all (the .m2/.skel file itself), a two-digit skin number ("00".."99"), or an
+        /// un-folded "_LODNN" skin suffix. Anything else appearing right after the stem (e.g. an
+        /// underscore followed by more name, as in "..._spirit") means the match is actually a
+        /// *different* model whose name happens to start with this stem as a plain text prefix,
+        /// not a sibling file of this model - this is what distinguishes
+        /// "knife_1h_ulatek_d_01.m2" from "knife_1h_ulatek_d_01_spirit.m2".
+        /// </summary>
+        private static readonly Regex SiblingSuffixRegex = new Regex(
+            @"\A(?:\d{2}|_LOD0\d)?\z",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>
+        /// Finds files in <paramref name="directory"/> that are true siblings of a model whose .m2
+        /// stem is <paramref name="stem"/> - i.e. share that exact stem, not just a common text
+        /// prefix (see <see cref="SiblingSuffixRegex"/>). <paramref name="searchPattern"/> is the
+        /// Directory.GetFiles pattern appended to the stem for the initial (coarse) filesystem
+        /// search, e.g. "*.skin" or "*"; the precise boundary check is then applied on top of it.
+        /// </summary>
+        private static IEnumerable<string> GetTrueSiblingFiles(string directory, string stem, string searchPattern)
+        {
+            foreach (var file in Directory.GetFiles(directory, stem + searchPattern))
+            {
+                var fileStem = Path.GetFileNameWithoutExtension(file);
+                if (fileStem.Length < stem.Length ||
+                    !fileStem.Substring(0, stem.Length).Equals(stem, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var suffix = fileStem.Substring(stem.Length);
+                if (SiblingSuffixRegex.IsMatch(suffix))
+                    yield return file;
+            }
+        }
+
+        /// <summary>
         /// Renames a "&lt;...&gt;_&lt;race&gt;_&lt;gender&gt;" style filename (e.g. "..._hu_m.m2") to the
         /// legacy "&lt;...&gt;_&lt;race&gt;&lt;gender&gt;" form (e.g. "..._hum.m2") that older tooling (and
         /// MultiConverter's own helm-detection regex) expects, and renames every sibling
@@ -497,9 +591,10 @@ namespace M2Mod
             if (string.Equals(newStem, stem, StringComparison.OrdinalIgnoreCase))
                 return m2FilePath;
 
-            // Rename every sibling file that starts with the old stem (the .m2 itself, its
-            // .skin files, and anything else sharing the same base name) to use the new stem.
-            foreach (var siblingPath in Directory.GetFiles(directory, stem + "*"))
+            // Rename every TRUE sibling file (the .m2 itself, its .skin/.skel files - not files
+            // belonging to some other model that merely starts with the same text) to use the
+            // new stem.
+            foreach (var siblingPath in GetTrueSiblingFiles(directory, stem, "*").ToArray())
             {
                 var siblingName = Path.GetFileName(siblingPath);
                 var newSiblingName = newStem + siblingName.Substring(stem.Length);
@@ -515,9 +610,11 @@ namespace M2Mod
         }
 
         /// <summary>
-        /// Moves a successfully-converted .m2 (and every sibling "&lt;stem&gt;*.skin" file next to it -
-        /// i.e. skin00-03.skin and any _LOD01-03.skin files) into a "Done" subfolder created inside
-        /// the file's own directory, so re-running the batch on the same folder won't reprocess it.
+        /// Moves a successfully-converted .m2 (and every true sibling "&lt;stem&gt;*.skin" file next
+        /// to it - i.e. skin00-03.skin and any _LOD01-03.skin files, but never a *different*
+        /// model's skins that merely start with the same text, e.g. "..._01_spirit00.skin" next to
+        /// "..._01.m2") into a "Done" subfolder created inside the file's own directory, so
+        /// re-running the batch on the same folder won't reprocess it.
         /// </summary>
         private void MoveToDoneFolder(string m2FilePath)
         {
@@ -530,8 +627,120 @@ namespace M2Mod
 
             MoveFileIntoFolder(m2FilePath, doneFolder);
 
-            foreach (var skinFile in Directory.GetFiles(directory, stem + "*.skin"))
+            foreach (var skinFile in GetTrueSiblingFiles(directory, stem, "*.skin").ToArray())
                 MoveFileIntoFolder(skinFile, doneFolder);
+        }
+
+        /// <summary>
+        /// Alternative to <see cref="MoveToDoneFolder"/> used when the "mirrored root done tree"
+        /// option is checked: instead of dropping a "Done" subfolder next to each processed file,
+        /// every processed file (and its true sibling "&lt;stem&gt;*.skin" files - see
+        /// <see cref="GetTrueSiblingFiles"/>) is collected into a sibling folder named
+        /// "&lt;root folder name&gt;_done" that reproduces the same relative subfolder path the file
+        /// had under the batch's root folder. E.g. batching "C:\Models" (with "Include subfolders"
+        /// checked) and processing "C:\Models\Creatures\Wolf.m2" moves it to
+        /// "C:\Models_done\Creatures\Wolf.m2", creating "C:\Models_done\Creatures" as needed.
+        /// Files processed directly in the root folder land straight in "&lt;root&gt;_done" itself.
+        ///
+        /// Unlike <see cref="MoveToDoneFolder"/>, files here are COPIED rather than moved: the
+        /// original .m2/.skin files are left in place under the root folder, since the whole point
+        /// of the mirrored tree is to produce a separate, parallel copy of the processed output
+        /// without disturbing the source files. Note that this means re-running the batch on the
+        /// same root folder WILL reprocess the same files again (nothing here marks them as done),
+        /// unlike the per-folder "Done" option.
+        /// </summary>
+        private void MoveToMirroredDoneFolder(string m2FilePath, string rootFolder)
+        {
+            var directory = Path.GetDirectoryName(m2FilePath);
+            var stem = Path.GetFileNameWithoutExtension(m2FilePath);
+
+            var mirroredRoot = rootFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + "_done";
+
+            var relativeDir = GetRelativeDirectory(rootFolder, directory);
+            var destinationFolder = string.IsNullOrEmpty(relativeDir)
+                ? mirroredRoot
+                : Path.Combine(mirroredRoot, relativeDir);
+
+            if (!Directory.Exists(destinationFolder))
+                Directory.CreateDirectory(destinationFolder);
+
+            CopyFileIntoFolder(m2FilePath, destinationFolder);
+
+            foreach (var skinFile in GetTrueSiblingFiles(directory, stem, "*.skin").ToArray())
+                CopyFileIntoFolder(skinFile, destinationFolder);
+        }
+
+        /// <summary>
+        /// Copies every ".blp" texture found anywhere under <paramref name="rootFolder"/> into the
+        /// mirrored "&lt;root&gt;_done" tree, preserving each texture's own relative folder path.
+        /// Run once, up front, for the whole batch (rather than per-model) since textures aren't
+        /// necessarily named after, or even referenced only by, the specific .m2 files being
+        /// processed - this simply reproduces the whole texture tree alongside the processed
+        /// models. Files are copied (not moved) and overwrite any existing copy already there.
+        /// </summary>
+        private void CopyAllTexturesToMirroredDone(string rootFolder)
+        {
+            var mirroredRoot = rootFolder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + "_done";
+
+            string[] textureFiles;
+            try
+            {
+                textureFiles = Directory.GetFiles(rootFolder, "*.blp", SearchOption.AllDirectories);
+            }
+            catch (Exception ex)
+            {
+                logTextBox.AppendLine(LogLevel.Warning, $"Failed to scan for .blp textures under '{rootFolder}': {ex.Message}");
+                return;
+            }
+
+            var copied = 0;
+            foreach (var textureFile in textureFiles)
+            {
+                var relativeDir = GetRelativeDirectory(rootFolder, Path.GetDirectoryName(textureFile));
+                var destinationFolder = string.IsNullOrEmpty(relativeDir)
+                    ? mirroredRoot
+                    : Path.Combine(mirroredRoot, relativeDir);
+
+                try
+                {
+                    if (!Directory.Exists(destinationFolder))
+                        Directory.CreateDirectory(destinationFolder);
+
+                    var destinationFile = Path.Combine(destinationFolder, Path.GetFileName(textureFile));
+                    File.Copy(textureFile, destinationFile, true);
+                    copied++;
+                }
+                catch (Exception copyEx)
+                {
+                    logTextBox.AppendLine(LogLevel.Warning,
+                        $"Failed to copy texture '{textureFile}' into the mirrored done tree: {copyEx.Message}");
+                }
+            }
+
+            if (copied > 0)
+                logTextBox.AppendLine(LogLevel.Info, $"Copied {copied} .blp texture(s) into the mirrored done tree.");
+        }
+
+        /// <summary>
+        /// Returns <paramref name="fullDirectory"/>'s path relative to <paramref name="rootFolder"/>
+        /// (empty string if they're the same folder). Both paths are resolved to their full,
+        /// trailing-separator-free form first so the comparison works regardless of how the user
+        /// typed/browsed to the root folder.
+        /// </summary>
+        private static string GetRelativeDirectory(string rootFolder, string fullDirectory)
+        {
+            var rootFull = Path.GetFullPath(rootFolder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var dirFull = Path.GetFullPath(fullDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            if (string.Equals(rootFull, dirFull, StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            if (dirFull.StartsWith(rootFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                return dirFull.Substring(rootFull.Length + 1);
+
+            // Shouldn't happen (every processed file comes from under the root folder), but fall
+            // back to just the leaf folder name rather than throwing.
+            return Path.GetFileName(dirFull);
         }
 
         private static void MoveFileIntoFolder(string filePath, string destinationFolder)
@@ -541,6 +750,17 @@ namespace M2Mod
                 File.Delete(destination);
 
             File.Move(filePath, destination);
+        }
+
+        /// <summary>
+        /// Like <see cref="MoveFileIntoFolder"/>, but copies instead of moving - used for the
+        /// mirrored "&lt;root&gt;_done" tree so the original file is left untouched in place.
+        /// Overwrites any existing copy already at the destination.
+        /// </summary>
+        private static void CopyFileIntoFolder(string filePath, string destinationFolder)
+        {
+            var destination = Path.Combine(destinationFolder, Path.GetFileName(filePath));
+            File.Copy(filePath, destination, true);
         }
 
         /// <summary>

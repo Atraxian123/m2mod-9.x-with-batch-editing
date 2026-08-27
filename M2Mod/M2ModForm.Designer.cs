@@ -712,7 +712,7 @@ namespace M2Mod
             this.tabControl.Name = "tabControl";
             this.tabControl.Padding = new System.Drawing.Point(10, 3);
             this.tabControl.SelectedIndex = 0;
-            this.tabControl.Size = new System.Drawing.Size(568, 256);
+            this.tabControl.Size = new System.Drawing.Size(568, 366);
             this.tabControl.TabIndex = 33;
             // 
             // toolTip1
@@ -749,7 +749,7 @@ namespace M2Mod
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(569, 301);
+            this.ClientSize = new System.Drawing.Size(569, 411);
             this.Controls.Add(this.profileLabel);
             this.Controls.Add(this.profilesComboBox);
             this.Controls.Add(this.statusStrip1);
