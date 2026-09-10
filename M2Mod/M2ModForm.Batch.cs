@@ -25,10 +25,29 @@ namespace M2Mod
         private CheckBox checkBoxBatchMirrorRootDone;
         private CheckBox checkBoxBatchCopyTextures;
         private Button buttonBatchStart;
+        private Button buttonBatchSaveLog;
+        private CheckBox checkBoxBatchAutoSaveLog;
         private ProgressBar progressBarBatch;
         private Label labelBatchStatus;
 
         private bool _batchRunning;
+
+        // Caches each directory's file listing (populated lazily, on first access) so that
+        // GetTrueSiblingFiles doesn't re-enumerate the same folder from disk for every single
+        // model that lives in it - a folder with N models previously triggered on the order of
+        // N separate Directory.GetFiles calls just for sibling lookups. Entries are evicted
+        // whenever something actually renames files in that directory (see
+        // InvalidateDirectoryFileCache), so this stays correct even though FixLodSkins/
+        // FixRaceGenderSuffix/the Done-folder move all touch the same directory in sequence for
+        // a given file.
+        private Dictionary<string, string[]> _directoryFileCache;
+
+        // How many files to process between UI status/log-box repaints. Forcing an immediate
+        // synchronous repaint (via Refresh()) after every single file is the dominant per-file
+        // overhead once native processing itself is fast (e.g. TXID-only removal with
+        // conversion skipped) - most of that cost buys nothing since a human can't perceive
+        // per-file updates on a batch of thousands anyway.
+        private const int UiRefreshInterval = 10;
 
         private void InitializeBatchTab()
         {
@@ -137,6 +156,22 @@ namespace M2Mod
             };
             buttonBatchStart.Click += ButtonBatchStart_Click;
 
+            buttonBatchSaveLog = new Button
+            {
+                Text = "Save Log...",
+                Location = new System.Drawing.Point(136, 233),
+                Size = new System.Drawing.Size(120, 28)
+            };
+            buttonBatchSaveLog.Click += ButtonBatchSaveLog_Click;
+
+            checkBoxBatchAutoSaveLog = new CheckBox
+            {
+                Text = "Auto-save log to root folder when batch finishes",
+                AutoSize = true,
+                Checked = true,
+                Location = new System.Drawing.Point(266, 239)
+            };
+
             progressBarBatch = new ProgressBar
             {
                 Location = new System.Drawing.Point(leftMargin, 273),
@@ -167,6 +202,8 @@ namespace M2Mod
             tabBatch.Controls.Add(checkBoxBatchMirrorRootDone);
             tabBatch.Controls.Add(checkBoxBatchCopyTextures);
             tabBatch.Controls.Add(buttonBatchStart);
+            tabBatch.Controls.Add(buttonBatchSaveLog);
+            tabBatch.Controls.Add(checkBoxBatchAutoSaveLog);
             tabBatch.Controls.Add(progressBarBatch);
             tabBatch.Controls.Add(labelBatchStatus);
 
@@ -202,6 +239,50 @@ namespace M2Mod
                 if (dialog.ShowDialog() == DialogResult.OK)
                     textBoxBatchFolder.Text = dialog.SelectedPath;
             }
+        }
+
+        private void ButtonBatchSaveLog_Click(object sender, EventArgs e)
+        {
+            if (logTextBox.TextLength == 0)
+            {
+                MessageBox.Show("The log is empty - there's nothing to save yet.", "Nothing to save",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var dialog = new SaveFileDialog())
+            {
+                dialog.Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*";
+                dialog.FileName = $"M2Mod_batch_log_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+                dialog.InitialDirectory = Directory.Exists(textBoxBatchFolder.Text)
+                    ? textBoxBatchFolder.Text
+                    : ProfileManager.CurrentProfile.Settings.WorkingDirectory;
+
+                if (dialog.ShowDialog() != DialogResult.OK)
+                    return;
+
+                try
+                {
+                    SaveLogToFile(dialog.FileName);
+                    MessageBox.Show($"Log saved to '{dialog.FileName}'.", "Log saved",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to save the log: {ex.Message}", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Writes the log box's plain text (timestamps included, RTF color formatting dropped -
+        /// it doesn't survive a .txt file anyway) out to <paramref name="filePath"/>, overwriting
+        /// any existing file there.
+        /// </summary>
+        private void SaveLogToFile(string filePath)
+        {
+            File.WriteAllText(filePath, logTextBox.Text);
         }
 
         private void ButtonBatchStart_Click(object sender, EventArgs e)
@@ -260,6 +341,7 @@ namespace M2Mod
         private void RunBatchRoundTrip(string[] files, string rootFolder)
         {
             _batchRunning = true;
+            _directoryFileCache = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
 
             // Suppress the per-warning/error modal popups while running a batch job -
             // they would otherwise interrupt the loop after every single file.
@@ -278,6 +360,7 @@ namespace M2Mod
             checkBoxBatchSkipConversion.Enabled = false;
             checkBoxBatchMirrorRootDone.Enabled = false;
             checkBoxBatchCopyTextures.Enabled = false;
+            checkBoxBatchAutoSaveLog.Enabled = false;
 
             var removeTxid = checkBoxBatchRemoveTxid.Checked;
             var fixLodSkins = checkBoxBatchFixLodSkins.Checked;
@@ -305,13 +388,24 @@ namespace M2Mod
                 foreach (var originalFile in files)
                 {
                     var file = originalFile;
+                    var fileIndex = succeeded + failed + 1;
+                    var isLastFile = fileIndex == files.Length;
 
-                    labelBatchStatus.Text = $"[{succeeded + failed + 1}/{files.Length}] {Path.GetFileName(file)}";
+                    // Setting .Text always invalidates the control (so it still repaints via the
+                    // normal message pump below), but the explicit, synchronous Refresh() calls
+                    // are what's expensive when done for every file - throttle those to roughly
+                    // every UiRefreshInterval files, always including the first and last so the
+                    // status text doesn't look stuck at 0% or skip showing completion.
+                    labelBatchStatus.Text = $"[{fileIndex}/{files.Length}] {Path.GetFileName(file)}";
                     SetStatus(skipConversion
                         ? $"Processing {Path.GetFileName(file)}..."
                         : $"Converting {Path.GetFileName(file)}...");
-                    labelBatchStatus.Refresh();
-                    statusStrip1.Refresh();
+
+                    if (fileIndex == 1 || isLastFile || fileIndex % UiRefreshInterval == 0)
+                    {
+                        labelBatchStatus.Refresh();
+                        statusStrip1.Refresh();
+                    }
 
                     var error = ProcessFile(file, removeTxid, skipConversion);
                     if (error != M2LibError.OK)
@@ -396,12 +490,27 @@ namespace M2Mod
                 checkBoxBatchSkipConversion.Enabled = true;
                 checkBoxBatchMirrorRootDone.Enabled = true;
                 checkBoxBatchCopyTextures.Enabled = checkBoxBatchMirrorRootDone.Checked;
+                checkBoxBatchAutoSaveLog.Enabled = true;
 
                 _batchRunning = false;
             }
 
             labelBatchStatus.Text = $"Done. {succeeded} succeeded, {failed} failed out of {files.Length}.";
             SetStatus("Batch operation finished.");
+
+            if (checkBoxBatchAutoSaveLog.Checked && logTextBox.TextLength > 0)
+            {
+                try
+                {
+                    var autoLogPath = Path.Combine(rootFolder, $"M2Mod_batch_log_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                    SaveLogToFile(autoLogPath);
+                    logTextBox.AppendLine(LogLevel.Info, $"Log saved to '{autoLogPath}'.");
+                }
+                catch (Exception logEx)
+                {
+                    logTextBox.AppendLine(LogLevel.Warning, $"Failed to auto-save the log: {logEx.Message}");
+                }
+            }
 
             MessageBox.Show(labelBatchStatus.Text, "Batch operation finished",
                 MessageBoxButtons.OK, failed > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
@@ -513,6 +622,11 @@ namespace M2Mod
                 File.Move(lodFiles[i], destination);
             }
 
+            // The renames above mean any cached directory listing is now stale for this folder -
+            // drop it so the upcoming suffix-rename/Done-move steps for this same file see the
+            // renamed .skin files instead of the old _LODNN names.
+            InvalidateDirectoryFileCache(directory);
+
             // Patch nSkinProfiles/nViews in the header to reflect the new total.
             var newSkinCount = currentSkinCount + (uint)lodFiles.Count;
             using (var stream = new FileStream(m2FilePath, FileMode.Open, FileAccess.Write))
@@ -550,14 +664,26 @@ namespace M2Mod
         /// <summary>
         /// Finds files in <paramref name="directory"/> that are true siblings of a model whose .m2
         /// stem is <paramref name="stem"/> - i.e. share that exact stem, not just a common text
-        /// prefix (see <see cref="SiblingSuffixRegex"/>). <paramref name="searchPattern"/> is the
-        /// Directory.GetFiles pattern appended to the stem for the initial (coarse) filesystem
-        /// search, e.g. "*.skin" or "*"; the precise boundary check is then applied on top of it.
+        /// prefix (see <see cref="SiblingSuffixRegex"/>). <paramref name="searchPattern"/> is
+        /// either "*" or an extension filter like "*.skin", applied on top of the exact-stem
+        /// boundary check.
+        ///
+        /// The underlying directory listing comes from <see cref="GetCachedDirectoryFiles"/>
+        /// rather than a fresh Directory.GetFiles call, since a folder full of models otherwise
+        /// gets re-enumerated from disk once per model (this is called for the .m2 renaming pass,
+        /// the Done-folder move, and the mirrored-done copy - each per file).
         /// </summary>
-        private static IEnumerable<string> GetTrueSiblingFiles(string directory, string stem, string searchPattern)
+        private IEnumerable<string> GetTrueSiblingFiles(string directory, string stem, string searchPattern)
         {
-            foreach (var file in Directory.GetFiles(directory, stem + searchPattern))
+            string extensionFilter = null;
+            if (searchPattern.Length > 1 && searchPattern[0] == '*' && searchPattern[1] == '.')
+                extensionFilter = searchPattern.Substring(1); // e.g. ".skin"
+
+            foreach (var file in GetCachedDirectoryFiles(directory))
             {
+                if (extensionFilter != null && !file.EndsWith(extensionFilter, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 var fileStem = Path.GetFileNameWithoutExtension(file);
                 if (fileStem.Length < stem.Length ||
                     !fileStem.Substring(0, stem.Length).Equals(stem, StringComparison.OrdinalIgnoreCase))
@@ -567,6 +693,37 @@ namespace M2Mod
                 if (SiblingSuffixRegex.IsMatch(suffix))
                     yield return file;
             }
+        }
+
+        /// <summary>
+        /// Returns the full listing of <paramref name="directory"/>, populating
+        /// <see cref="_directoryFileCache"/> on first access and reusing it on subsequent calls
+        /// for the same directory. Falls back to a direct, uncached Directory.GetFiles call if
+        /// the cache hasn't been set up (e.g. called outside of a batch run).
+        /// </summary>
+        private string[] GetCachedDirectoryFiles(string directory)
+        {
+            if (_directoryFileCache == null)
+                return Directory.GetFiles(directory);
+
+            if (!_directoryFileCache.TryGetValue(directory, out var files))
+            {
+                files = Directory.GetFiles(directory);
+                _directoryFileCache[directory] = files;
+            }
+
+            return files;
+        }
+
+        /// <summary>
+        /// Drops any cached listing for <paramref name="directory"/> so the next
+        /// <see cref="GetTrueSiblingFiles"/> call re-reads it from disk. Must be called any time
+        /// something actually renames or removes files in that directory (LOD-skin folding,
+        /// race/gender suffix renaming) so a later cache hit doesn't hand back stale filenames.
+        /// </summary>
+        private void InvalidateDirectoryFileCache(string directory)
+        {
+            _directoryFileCache?.Remove(directory);
         }
 
         /// <summary>
@@ -605,6 +762,10 @@ namespace M2Mod
 
                 File.Move(siblingPath, newSiblingPath);
             }
+
+            // Same reasoning as in FixLodSkins: the directory's contents just changed, so drop
+            // the cached listing before the Done-folder move step reads it for the new stem.
+            InvalidateDirectoryFileCache(directory);
 
             return Path.Combine(directory, newStem + ".m2");
         }
