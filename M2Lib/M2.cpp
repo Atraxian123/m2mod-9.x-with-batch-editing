@@ -10,9 +10,61 @@
 #include "StringHelpers.h"
 #include "StringHash.h"
 #include <filesystem>
+#include <vector>
 
 using namespace M2Lib::M2Element;
 using namespace M2Lib::M2Chunk;
+
+namespace
+{
+	// When a FileDataId can't be resolved via the listfile (e.g. it's missing or out of date),
+	// game data conventionally still stores the file under an "Unknown\<FileDataId>.<ext>" path.
+	// Before giving up and falling back to the classic "<model>0N.skin" naming scheme, check
+	// whether that conventionally-named file actually exists on disk somewhere sensible.
+	std::wstring TryFindUnknownFile(M2Lib::Settings const& settings, std::wstring const& M2FileName, uint32_t FileDataId, wchar_t const* Extension, bool Save)
+	{
+		std::vector<std::filesystem::path> candidateRoots;
+
+		if (!Save && wcslen(settings.WorkingDirectory))
+			candidateRoots.emplace_back(settings.WorkingDirectory);
+		if (Save && wcslen(settings.OutputDirectory))
+			candidateRoots.emplace_back(settings.OutputDirectory);
+
+		// Also try relative to the .m2 itself and one level up, in case "Unknown" sits
+		// alongside the model (e.g. Item\ObjectComponents\Head\Unknown\123.skin) or beside
+		// its parent folder (e.g. Item\ObjectComponents\Unknown\123.skin).
+		auto m2Dir = std::filesystem::path(M2FileName).parent_path();
+		if (!m2Dir.empty())
+		{
+			candidateRoots.push_back(m2Dir);
+			candidateRoots.push_back(m2Dir.parent_path());
+		}
+
+		wchar_t idBuffer[16];
+		std::swprintf(idBuffer, 16, L"%u", FileDataId);
+		auto fileName = std::wstring(idBuffer) + Extension;
+
+		for (auto& root : candidateRoots)
+		{
+			if (root.empty())
+				continue;
+
+			std::error_code ec;
+
+			// Most common case: "<root>\Unknown\<id>.<ext>".
+			auto candidate = root / L"Unknown" / fileName;
+			if (std::filesystem::exists(candidate, ec))
+				return candidate.wstring();
+
+			// Some listfiles/extractors lowercase folder names.
+			candidate = root / L"unknown" / fileName;
+			if (std::filesystem::exists(candidate, ec))
+				return candidate.wstring();
+		}
+
+		return L"";
+	}
+}
 
 uint32_t M2Lib::M2::GetLastElementIndex() const
 {
@@ -357,31 +409,36 @@ M2Lib::EError M2Lib::M2::LoadSkeleton()
 
 	if (auto chunk = (SkeletonChunk::SKPDChunk*)Skeleton->GetChunk(SkeletonChunk::ESkeletonChunk::SKPD))
 	{
+		std::filesystem::path ParentSkeletonPath;
 		if (auto info = GetFileInfoByFileDataId(chunk->Data.ParentSkeletonFileId))
 		{
-			std::filesystem::path ParentSkeletonPath;
 			if (wcslen(Settings.WorkingDirectory))
 				ParentSkeletonPath = std::filesystem::path(Settings.WorkingDirectory) / info->Path;
 			else
 				ParentSkeletonPath = std::filesystem::path(_FileName).parent_path() / std::filesystem::path(info->Path).filename();
-
-			auto parentSkeleton = new M2Lib::Skeleton();
-			auto Error = parentSkeleton->Load(ParentSkeletonPath.c_str());
-			if (Error == EError_OK)
-			{
-				sLogger.LogInfo(L"Parent skeleton file [%u] %s loaded", chunk->Data.ParentSkeletonFileId, ParentSkeletonPath.wstring().c_str());
-				ParentSkeleton = parentSkeleton;
-			}
-			else
-			{
-				sLogger.LogError(L"Error: Failed to load parent skeleton file [%u] %s", chunk->Data.ParentSkeletonFileId, ParentSkeletonPath.wstring().c_str());
-				delete parentSkeleton;
-				return EError_FailedToLoadSkeleton_CouldNotOpenFile;
-			}
+		}
+		else if (auto unknownPath = TryFindUnknownFile(Settings, _FileName, chunk->Data.ParentSkeletonFileId, L".skel", false); !unknownPath.empty())
+		{
+			sLogger.LogInfo(L"Parent skeleton FileDataId [%u] not found in listfile, but located by convention at '%s'", chunk->Data.ParentSkeletonFileId, unknownPath.c_str());
+			ParentSkeletonPath = unknownPath;
 		}
 		else
 		{
 			sLogger.LogError(L"Error: skeleton has parent skeleton chunk, but parent file not loaded!");
+			return EError_FailedToLoadSkeleton_CouldNotOpenFile;
+		}
+
+		auto parentSkeleton = new M2Lib::Skeleton();
+		auto Error = parentSkeleton->Load(ParentSkeletonPath.c_str());
+		if (Error == EError_OK)
+		{
+			sLogger.LogInfo(L"Parent skeleton file [%u] %s loaded", chunk->Data.ParentSkeletonFileId, ParentSkeletonPath.wstring().c_str());
+			ParentSkeleton = parentSkeleton;
+		}
+		else
+		{
+			sLogger.LogError(L"Error: Failed to load parent skeleton file [%u] %s", chunk->Data.ParentSkeletonFileId, ParentSkeletonPath.wstring().c_str());
+			delete parentSkeleton;
 			return EError_FailedToLoadSkeleton_CouldNotOpenFile;
 		}
 	}
@@ -1900,6 +1957,13 @@ bool M2Lib::M2::GetFileSkin(std::wstring& SkinFileNameResultBuffer, std::wstring
 			return true;
 		}
 
+		if (auto unknownPath = TryFindUnknownFile(Settings, M2FileName, skinFileDataId, L".skin", Save); !unknownPath.empty())
+		{
+			sLogger.LogInfo(L"Skin FileDataId [%u] not found in listfile, but located by convention at '%s'", skinFileDataId, unknownPath.c_str());
+			SkinFileNameResultBuffer = unknownPath;
+			return true;
+		}
+
 		sLogger.LogWarning(L"Warning: skin FileDataId [%u] not found in listfile! Listfile is not up to date! Trying default skin name", skinFileDataId);
 	}
 
@@ -1956,6 +2020,13 @@ bool M2Lib::M2::GetFileSkeleton(std::wstring& SkeletonFileNameResultBuffer, std:
 	}
 	
 	SkeletonFileNameResultBuffer.resize(1024);
+	if (auto unknownPath = TryFindUnknownFile(Settings, M2FileName, chunk->SkeletonFileDataId, L".skel", Save); !unknownPath.empty())
+	{
+		sLogger.LogInfo(L"Skeleton FileDataId [%u] not found in listfile, but located by convention at '%s'", chunk->SkeletonFileDataId, unknownPath.c_str());
+		SkeletonFileNameResultBuffer = unknownPath;
+		return true;
+	}
+
 	sLogger.LogWarning(L"Warning: skeleton FileDataId [%u] not found in listfile! Listfile is not up to date! Trying default skeleton name", chunk->SkeletonFileDataId);
 	std::swprintf((wchar_t*)SkeletonFileNameResultBuffer.data(),
 		SkeletonFileNameResultBuffer.size(),
@@ -1978,6 +2049,13 @@ bool M2Lib::M2::GetFileParentSkeleton(std::wstring& SkeletonFileNameResultBuffer
 	auto info = GetFileInfoByFileDataId(chunk->Data.ParentSkeletonFileId);
 	if (!info)
 	{
+		if (auto unknownPath = TryFindUnknownFile(Settings, M2FileName, chunk->Data.ParentSkeletonFileId, L".skel", Save); !unknownPath.empty())
+		{
+			sLogger.LogInfo(L"Parent skeleton FileDataId [%u] not found in listfile, but located by convention at '%s'", chunk->Data.ParentSkeletonFileId, unknownPath.c_str());
+			SkeletonFileNameResultBuffer = unknownPath;
+			return true;
+		}
+
 		sLogger.LogError(L"Can't determine parent skeleton [%u] file name for model. Parent skeleton will not be saved", chunk->Data.ParentSkeletonFileId);
 		return false;
 	}
