@@ -11,3 +11,5 @@ binaries
 *.filters
 *.suo
 *.sdf
+m2mod and converter/netcoreapp3.1/listfile.csv
+m2mod and converter/mappings/listfile.csv

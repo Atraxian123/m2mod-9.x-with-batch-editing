@@ -1,0 +1,48 @@
+{
+  "ActiveProfile": "309cdb4b-728b-4097-a74b-bd10450f1f39",
+  "Profiles": [
+    {
+      "Id": "309cdb4b-728b-4097-a74b-bd10450f1f39",
+      "Name": "Default",
+      "Settings": {
+        "OutputDirectory": "",
+        "WorkingDirectory": "",
+        "MappingsDirectory": "",
+        "ForceLoadExpansion": -1,
+        "CustomFilesStartIndex": 0,
+        "MergeBones": true,
+        "MergeAttachments": true,
+        "MergeCameras": true,
+        "FixSeams": false,
+        "FixEdgeNormals": true,
+        "IgnoreOriginalMeshIndexes": false,
+        "FixAnimationsTest": false,
+        "UseFallbackSkinNaming": false
+      },
+      "Configuration": {
+        "InputM2Exp": "",
+        "OutputM2I": "",
+        "InputM2Imp": "",
+        "InputM2I": "",
+        "ReplaceM2": "",
+        "ReplaceM2Checked": false,
+        "OldCompareM2": null,
+        "NewCompareM2": null,
+        "CompareWeightThreshold": 0.0,
+        "CompareSourceScale": 0.0,
+        "PredictScale": false,
+        "NormalizationConfig": {
+          "UseAdvanced": false,
+          "Simple": {
+            "AlignFacials": false,
+            "AlignHair": false,
+            "Data": ""
+          },
+          "Advanced": {
+            "Rules": []
+          }
+        }
+      }
+    }
+  ]
+}
