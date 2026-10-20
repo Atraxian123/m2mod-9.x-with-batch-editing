@@ -64,6 +64,31 @@ namespace
 
 		return L"";
 	}
+
+	// A retail .phys is a plain sequence of {fourcc, u32 size, payload} chunks that starts with PHYS
+	// (stored byte-reversed, "SYHP", in the files measured so far). The same stream is what the model's
+	// PFDC chunk holds. Only the framing is checked here; the content is written out untouched.
+	bool PhysLooksValid(std::vector<uint8_t> const& Data)
+	{
+		if (Data.size() < 8)
+			return false;
+
+		if (memcmp(Data.data(), "PHYS", 4) != 0 && memcmp(Data.data(), "SYHP", 4) != 0)
+			return false;
+
+		size_t Offs = 0;
+		while (Offs + 8 <= Data.size())
+		{
+			uint32_t Size;
+			memcpy(&Size, Data.data() + Offs + 4, 4);
+			if (Size > Data.size() - Offs - 8)
+				return false;
+
+			Offs += 8 + (size_t)Size;
+		}
+
+		return Offs == Data.size();
+	}
 }
 
 uint32_t M2Lib::M2::GetLastElementIndex() const
@@ -3241,6 +3266,20 @@ M2Lib::EError M2Lib::M2_ExportM2Intermediate(M2LIB_HANDLE handle, const wchar_t*
 	}
 }
 
+M2Lib::EError M2Lib::M2_ExtractPhys(M2LIB_HANDLE handle, const wchar_t* FileName)
+{
+	try
+	{
+		return static_cast<M2*>(handle)->ExtractPhys(FileName);
+	}
+	catch (std::exception& e)
+	{
+		sLogger.LogError(L"Exception: %s", StringHelpers::StringToWString(e.what()).c_str());
+
+		return EError_FAIL;
+	}
+}
+
 M2Lib::EError M2Lib::M2_ImportM2Intermediate(M2LIB_HANDLE handle, const wchar_t* FileName)
 {
 	try
@@ -3346,6 +3385,115 @@ M2Lib::FileInfo const* M2Lib::M2::GetFileInfoByPartialPath(std::wstring const& P
 	}
 
 	return storageRef->GetFileInfoByPartialPath(Path);
+}
+
+std::wstring M2Lib::M2::FindPhysFile(uint32_t FileDataId) const
+{
+	std::error_code ec;
+	auto m2Dir = std::filesystem::path(_FileName).parent_path();
+
+	// same lookup order as the parent skeleton: listfile path under the working directory, then the
+	// listfile file name next to the model, then the conventional "Unknown\\<id>.phys".
+	if (auto info = GetFileInfoByFileDataId(FileDataId))
+	{
+		if (wcslen(Settings.WorkingDirectory))
+		{
+			auto candidate = std::filesystem::path(Settings.WorkingDirectory) / info->Path;
+			if (std::filesystem::exists(candidate, ec))
+				return candidate.wstring();
+		}
+
+		auto candidate = m2Dir / std::filesystem::path(info->Path).filename();
+		if (std::filesystem::exists(candidate, ec))
+			return candidate.wstring();
+	}
+
+	auto unknownPath = TryFindUnknownFile(Settings, _FileName, FileDataId, L".phys", false);
+	if (!unknownPath.empty())
+		return unknownPath;
+
+	// last resort: "<id>.phys" beside the model
+	wchar_t idBuffer[16];
+	std::swprintf(idBuffer, 16, L"%u", FileDataId);
+	auto candidate = m2Dir / (std::wstring(idBuffer) + L".phys");
+	if (std::filesystem::exists(candidate, ec))
+		return candidate.wstring();
+
+	return L"";
+}
+
+M2Lib::EError M2Lib::M2::ExtractPhys(wchar_t const* FileName)
+{
+	if (!FileName || !wcslen(FileName))
+	{
+		sLogger.LogError(L"Error: No output .phys file specified");
+		return EError_FailedToExtractPhys_NoFileSpecified;
+	}
+
+	if (!GetChunk(EM2Chunk::Model))
+	{
+		sLogger.LogError(L"Error: No M2 loaded");
+		return EError_FAIL;
+	}
+
+	std::vector<uint8_t> Data;
+
+	auto physData = (RawChunk*)GetChunk(EM2Chunk::PhysicData);
+	auto physRef = (PFIDChunk*)GetChunk(EM2Chunk::Physic);
+
+	if (physData && !physData->RawData.empty())
+	{
+		Data = physData->RawData;
+		sLogger.LogInfo(L"Physics: inline PFDC chunk, %u bytes", (uint32_t)Data.size());
+	}
+	else if (physRef && physRef->PhysFileId)
+	{
+		auto PhysPath = FindPhysFile(physRef->PhysFileId);
+		if (PhysPath.empty())
+		{
+			sLogger.LogError(L"Error: physics file [%u] %s not found", physRef->PhysFileId, PathInfo(physRef->PhysFileId));
+			return EError_FailedToExtractPhys_PhysFileNotFound;
+		}
+
+		std::fstream In;
+		In.open(PhysPath, std::ios::in | std::ios::binary);
+		if (In.fail())
+		{
+			sLogger.LogError(L"Error: could not open physics file %s", PhysPath.c_str());
+			return EError_FailedToExtractPhys_PhysFileNotFound;
+		}
+
+		In.seekg(0, std::ios::end);
+		Data.resize((size_t)In.tellg());
+		In.seekg(0, std::ios::beg);
+		In.read((char*)Data.data(), Data.size());
+
+		sLogger.LogInfo(L"Physics: file [%u] %s, %u bytes", physRef->PhysFileId, PhysPath.c_str(), (uint32_t)Data.size());
+	}
+	else
+	{
+		sLogger.LogInfo(L"Physics: model has no PFDC or PFID chunk");
+		return EError_FailedToExtractPhys_NoPhysicsData;
+	}
+
+	if (!PhysLooksValid(Data))
+		sLogger.LogWarning(L"Warning: physics data does not look like a .phys chunk stream; writing it anyway");
+
+	std::fstream Out;
+	Out.open(FileName, std::ios::out | std::ios::trunc | std::ios::binary);
+	if (Out.fail())
+	{
+		sLogger.LogError(L"Error: Failed to open file %s", FileName);
+		return EError_FailedToExtractPhys_CouldNotWriteFile;
+	}
+
+	Out.write((const char*)Data.data(), Data.size());
+	Out.flush();
+	if (Out.fail())
+		return EError_FailedToExtractPhys_CouldNotWriteFile;
+
+	sLogger.LogInfo(L"Physics written to %s", FileName);
+	return EError_OK;
 }
 
 wchar_t const* M2Lib::M2::PathInfo(uint32_t FileDataId) const

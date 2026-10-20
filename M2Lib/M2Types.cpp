@@ -194,6 +194,14 @@ wchar_t const* M2Lib::GetErrorText(EError Error)
 			return L"error faled to save SKELETON, no file was specified.";
 		case EError_FailedToLoadSkeleton_CouldNotOpenFile:
 			return L"error: failed to load SKELETON, could not open file.";
+		case EError_FailedToExtractPhys_NoFileSpecified:
+			return L"error: failed to extract PHYS, no file was specified.";
+		case EError_FailedToExtractPhys_NoPhysicsData:
+			return L"error: this model has no physics data (no PFDC or PFID chunk).";
+		case EError_FailedToExtractPhys_PhysFileNotFound:
+			return L"error: failed to extract PHYS, the file named by the PFID chunk was not found (set the working directory, or put it next to the model).";
+		case EError_FailedToExtractPhys_CouldNotWriteFile:
+			return L"error: failed to extract PHYS, could not write the output file.";
 		default:
 			break;
 	}

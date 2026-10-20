@@ -297,6 +297,9 @@ namespace M2Lib
 
 		// exports the loaded M2 as an M2I file.
 		EError ExportM2Intermediate(wchar_t const* FileName);
+		// writes the model's retail physics (.phys) to FileName, byte for byte: the inline PFDC chunk,
+		// or else the file named by the PFID chunk. Call after Load, i.e. before a downport drops them.
+		EError ExtractPhys(wchar_t const* FileName);
 		// imports an M2I file and merges it with already loaded M2.
 		EError ImportM2Intermediate(wchar_t const* FileName);
 		
@@ -396,6 +399,7 @@ namespace M2Lib
 		FileInfo const* GetFileInfoByPath(std::wstring const& Path) const;
 		FileInfo const* GetFileInfoByPartialPath(std::wstring const& Path) const;
 		wchar_t const* PathInfo(uint32_t FileDataId) const;
+		std::wstring FindPhysFile(uint32_t FileDataId) const;
 	};
 
 
@@ -404,6 +408,7 @@ namespace M2Lib
 	M2LIB_API EError __cdecl M2_Save(M2LIB_HANDLE handle, const wchar_t* FileName, uint8_t saveMask);
 	M2LIB_API EError __cdecl M2_SetReplaceM2(M2LIB_HANDLE handle, const wchar_t* FileName);
 	M2LIB_API EError __cdecl M2_ExportM2Intermediate(M2LIB_HANDLE handle, const wchar_t* FileName);
+	M2LIB_API EError __cdecl M2_ExtractPhys(M2LIB_HANDLE handle, const wchar_t* FileName);
 	M2LIB_API EError __cdecl M2_ImportM2Intermediate(M2LIB_HANDLE handle, const wchar_t* FileName);
 	M2LIB_API EError __cdecl M2_SetNeedRemapReferences(M2LIB_HANDLE handle, const wchar_t* remapPath);
 	M2LIB_API EError __cdecl M2_SetNeedRemoveTXIDChunk(M2LIB_HANDLE handle);

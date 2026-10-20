@@ -85,6 +85,7 @@ namespace M2Mod
             this.label7 = new System.Windows.Forms.Label();
             this.tabExport = new System.Windows.Forms.TabPage();
             this.exportButtonGo = new M2Mod.Controls.SplitButton();
+            this.checkBoxExtractPhys = new System.Windows.Forms.CheckBox();
             this.goButtonContextMenuStrip = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.customMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tabControl = new System.Windows.Forms.TabControl();
@@ -662,6 +663,7 @@ namespace M2Mod
             // 
             this.tabExport.Controls.Add(this.panelImputM2Exp);
             this.tabExport.Controls.Add(this.panelOutputM2I);
+            this.tabExport.Controls.Add(this.checkBoxExtractPhys);
             this.tabExport.Controls.Add(this.exportButtonGo);
             this.tabExport.Location = new System.Drawing.Point(4, 22);
             this.tabExport.Name = "tabExport";
@@ -670,6 +672,17 @@ namespace M2Mod
             this.tabExport.TabIndex = 0;
             this.tabExport.Text = "M2 -> M2I";
             this.tabExport.UseVisualStyleBackColor = true;
+            // 
+            // checkBoxExtractPhys
+            // 
+            this.checkBoxExtractPhys.AutoSize = true;
+            this.checkBoxExtractPhys.Location = new System.Drawing.Point(8, 72);
+            this.checkBoxExtractPhys.Name = "checkBoxExtractPhys";
+            this.checkBoxExtractPhys.Size = new System.Drawing.Size(200, 17);
+            this.checkBoxExtractPhys.TabIndex = 27;
+            this.checkBoxExtractPhys.Text = "Also extract physics (.phys)";
+            this.toolTip1.SetToolTip(this.checkBoxExtractPhys, "Retail models keep their physics inline (PFDC) or in a file named by the PFID chunk. Downporting drops both, so save it here first. The .phys is written next to the target M2I, with the same name.");
+            this.checkBoxExtractPhys.UseVisualStyleBackColor = true;
             // 
             // exportButtonGo
             // 
@@ -839,6 +852,7 @@ namespace M2Mod
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.TabPage tabExport;
         private SplitButton exportButtonGo;
+        private System.Windows.Forms.CheckBox checkBoxExtractPhys;
         private System.Windows.Forms.TabControl tabControl;
         private System.Windows.Forms.ComboBox profilesComboBox;
         private System.Windows.Forms.Label profileLabel;

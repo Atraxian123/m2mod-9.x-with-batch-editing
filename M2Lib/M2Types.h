@@ -206,6 +206,11 @@ namespace M2Lib
 
 		EError_FailedToLoadSkeleton_NoFileSpecified,
 		EError_FailedToLoadSkeleton_CouldNotOpenFile,
+
+		EError_FailedToExtractPhys_NoFileSpecified,
+		EError_FailedToExtractPhys_NoPhysicsData,
+		EError_FailedToExtractPhys_PhysFileNotFound,
+		EError_FailedToExtractPhys_CouldNotWriteFile,
 	};
 
 	M2LIB_API wchar_t const* __cdecl GetErrorText(EError Error);

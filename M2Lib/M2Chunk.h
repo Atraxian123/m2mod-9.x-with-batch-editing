@@ -10,6 +10,7 @@ namespace M2Lib
 		{
 			Model = 'MD21',
 			Physic = 'PFID',
+			PhysicData = 'PFDC',	// retail: the .phys payload stored inline in the model
 			Animation = 'AFID',
 			Skin = 'SFID',
 			Bone = 'BFID',

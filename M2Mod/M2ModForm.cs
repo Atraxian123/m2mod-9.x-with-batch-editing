@@ -355,6 +355,29 @@ namespace M2Mod
                 return;
             }
 
+            if (checkBoxExtractPhys.Checked)
+            {
+                // The M2I only carries what a 3.3.5 model has; the retail physics would be lost, so keep it as a .phys.
+                var physPath = Path.ChangeExtension(textBoxOutputM2I.Text, ".phys");
+                var physError = Imports.M2_ExtractPhys(m2, physPath);
+                if (physError == M2LibError.FailedToExtractPhys_NoPhysicsData)
+                {
+                    SetStatus("Export done. This model has no physics data.");
+                }
+                else if (physError != M2LibError.OK)
+                {
+                    SetStatus("Export done, but physics: " + Imports.GetErrorText(physError));
+                }
+                else
+                {
+                    SetStatus("Export done. Physics saved to " + Path.GetFileName(physPath));
+                }
+
+                exportButtonGo.Enabled = true;
+                Imports.M2_Free(m2);
+                return;
+            }
+
             SetStatus("Export done.");
 
             exportButtonGo.Enabled = true;

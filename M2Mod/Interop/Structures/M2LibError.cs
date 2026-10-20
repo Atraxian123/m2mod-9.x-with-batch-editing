@@ -37,5 +37,10 @@ namespace M2Mod.Interop.Structures
 
         FailedToLoadSkeleton_NoFileSpecified,
         FailedToLoadSkeleton_CouldNotOpenFile,
+
+        FailedToExtractPhys_NoFileSpecified,
+        FailedToExtractPhys_NoPhysicsData,
+        FailedToExtractPhys_PhysFileNotFound,
+        FailedToExtractPhys_CouldNotWriteFile,
     }
 }

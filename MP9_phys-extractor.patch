@@ -1,0 +1,351 @@
+diff -ru orig/M2Lib/M2.cpp work/M2Lib/M2.cpp
+--- orig/M2Lib/M2.cpp	2026-10-20 05:25:15.260400742 +0000
++++ work/M2Lib/M2.cpp	2026-10-20 05:25:43.692454493 +0000
+@@ -64,6 +64,31 @@
+ 
+ 		return L"";
+ 	}
++
++	// A retail .phys is a plain sequence of {fourcc, u32 size, payload} chunks that starts with PHYS
++	// (stored byte-reversed, "SYHP", in the files measured so far). The same stream is what the model's
++	// PFDC chunk holds. Only the framing is checked here; the content is written out untouched.
++	bool PhysLooksValid(std::vector<uint8_t> const& Data)
++	{
++		if (Data.size() < 8)
++			return false;
++
++		if (memcmp(Data.data(), "PHYS", 4) != 0 && memcmp(Data.data(), "SYHP", 4) != 0)
++			return false;
++
++		size_t Offs = 0;
++		while (Offs + 8 <= Data.size())
++		{
++			uint32_t Size;
++			memcpy(&Size, Data.data() + Offs + 4, 4);
++			if (Size > Data.size() - Offs - 8)
++				return false;
++
++			Offs += 8 + (size_t)Size;
++		}
++
++		return Offs == Data.size();
++	}
+ }
+ 
+ uint32_t M2Lib::M2::GetLastElementIndex() const
+@@ -3241,6 +3266,20 @@
+ 	}
+ }
+ 
++M2Lib::EError M2Lib::M2_ExtractPhys(M2LIB_HANDLE handle, const wchar_t* FileName)
++{
++	try
++	{
++		return static_cast<M2*>(handle)->ExtractPhys(FileName);
++	}
++	catch (std::exception& e)
++	{
++		sLogger.LogError(L"Exception: %s", StringHelpers::StringToWString(e.what()).c_str());
++
++		return EError_FAIL;
++	}
++}
++
+ M2Lib::EError M2Lib::M2_ImportM2Intermediate(M2LIB_HANDLE handle, const wchar_t* FileName)
+ {
+ 	try
+@@ -3348,6 +3387,115 @@
+ 	return storageRef->GetFileInfoByPartialPath(Path);
+ }
+ 
++std::wstring M2Lib::M2::FindPhysFile(uint32_t FileDataId) const
++{
++	std::error_code ec;
++	auto m2Dir = std::filesystem::path(_FileName).parent_path();
++
++	// same lookup order as the parent skeleton: listfile path under the working directory, then the
++	// listfile file name next to the model, then the conventional "Unknown\\<id>.phys".
++	if (auto info = GetFileInfoByFileDataId(FileDataId))
++	{
++		if (wcslen(Settings.WorkingDirectory))
++		{
++			auto candidate = std::filesystem::path(Settings.WorkingDirectory) / info->Path;
++			if (std::filesystem::exists(candidate, ec))
++				return candidate.wstring();
++		}
++
++		auto candidate = m2Dir / std::filesystem::path(info->Path).filename();
++		if (std::filesystem::exists(candidate, ec))
++			return candidate.wstring();
++	}
++
++	auto unknownPath = TryFindUnknownFile(Settings, _FileName, FileDataId, L".phys", false);
++	if (!unknownPath.empty())
++		return unknownPath;
++
++	// last resort: "<id>.phys" beside the model
++	wchar_t idBuffer[16];
++	std::swprintf(idBuffer, 16, L"%u", FileDataId);
++	auto candidate = m2Dir / (std::wstring(idBuffer) + L".phys");
++	if (std::filesystem::exists(candidate, ec))
++		return candidate.wstring();
++
++	return L"";
++}
++
++M2Lib::EError M2Lib::M2::ExtractPhys(wchar_t const* FileName)
++{
++	if (!FileName || !wcslen(FileName))
++	{
++		sLogger.LogError(L"Error: No output .phys file specified");
++		return EError_FailedToExtractPhys_NoFileSpecified;
++	}
++
++	if (!GetChunk(EM2Chunk::Model))
++	{
++		sLogger.LogError(L"Error: No M2 loaded");
++		return EError_FAIL;
++	}
++
++	std::vector<uint8_t> Data;
++
++	auto physData = (RawChunk*)GetChunk(EM2Chunk::PhysicData);
++	auto physRef = (PFIDChunk*)GetChunk(EM2Chunk::Physic);
++
++	if (physData && !physData->RawData.empty())
++	{
++		Data = physData->RawData;
++		sLogger.LogInfo(L"Physics: inline PFDC chunk, %u bytes", (uint32_t)Data.size());
++	}
++	else if (physRef && physRef->PhysFileId)
++	{
++		auto PhysPath = FindPhysFile(physRef->PhysFileId);
++		if (PhysPath.empty())
++		{
++			sLogger.LogError(L"Error: physics file [%u] %s not found", physRef->PhysFileId, PathInfo(physRef->PhysFileId));
++			return EError_FailedToExtractPhys_PhysFileNotFound;
++		}
++
++		std::fstream In;
++		In.open(PhysPath, std::ios::in | std::ios::binary);
++		if (In.fail())
++		{
++			sLogger.LogError(L"Error: could not open physics file %s", PhysPath.c_str());
++			return EError_FailedToExtractPhys_PhysFileNotFound;
++		}
++
++		In.seekg(0, std::ios::end);
++		Data.resize((size_t)In.tellg());
++		In.seekg(0, std::ios::beg);
++		In.read((char*)Data.data(), Data.size());
++
++		sLogger.LogInfo(L"Physics: file [%u] %s, %u bytes", physRef->PhysFileId, PhysPath.c_str(), (uint32_t)Data.size());
++	}
++	else
++	{
++		sLogger.LogInfo(L"Physics: model has no PFDC or PFID chunk");
++		return EError_FailedToExtractPhys_NoPhysicsData;
++	}
++
++	if (!PhysLooksValid(Data))
++		sLogger.LogWarning(L"Warning: physics data does not look like a .phys chunk stream; writing it anyway");
++
++	std::fstream Out;
++	Out.open(FileName, std::ios::out | std::ios::trunc | std::ios::binary);
++	if (Out.fail())
++	{
++		sLogger.LogError(L"Error: Failed to open file %s", FileName);
++		return EError_FailedToExtractPhys_CouldNotWriteFile;
++	}
++
++	Out.write((const char*)Data.data(), Data.size());
++	Out.flush();
++	if (Out.fail())
++		return EError_FailedToExtractPhys_CouldNotWriteFile;
++
++	sLogger.LogInfo(L"Physics written to %s", FileName);
++	return EError_OK;
++}
++
+ wchar_t const* M2Lib::M2::PathInfo(uint32_t FileDataId) const
+ {
+ 	auto itr = customFileInfosByFileDataId.find(FileDataId);
+diff -ru orig/M2Lib/M2.h work/M2Lib/M2.h
+--- orig/M2Lib/M2.h	2026-10-20 05:25:15.260596852 +0000
++++ work/M2Lib/M2.h	2026-10-20 05:25:24.642967019 +0000
+@@ -297,6 +297,9 @@
+ 
+ 		// exports the loaded M2 as an M2I file.
+ 		EError ExportM2Intermediate(wchar_t const* FileName);
++		// writes the model's retail physics (.phys) to FileName, byte for byte: the inline PFDC chunk,
++		// or else the file named by the PFID chunk. Call after Load, i.e. before a downport drops them.
++		EError ExtractPhys(wchar_t const* FileName);
+ 		// imports an M2I file and merges it with already loaded M2.
+ 		EError ImportM2Intermediate(wchar_t const* FileName);
+ 		
+@@ -396,6 +399,7 @@
+ 		FileInfo const* GetFileInfoByPath(std::wstring const& Path) const;
+ 		FileInfo const* GetFileInfoByPartialPath(std::wstring const& Path) const;
+ 		wchar_t const* PathInfo(uint32_t FileDataId) const;
++		std::wstring FindPhysFile(uint32_t FileDataId) const;
+ 	};
+ 
+ 
+@@ -404,6 +408,7 @@
+ 	M2LIB_API EError __cdecl M2_Save(M2LIB_HANDLE handle, const wchar_t* FileName, uint8_t saveMask);
+ 	M2LIB_API EError __cdecl M2_SetReplaceM2(M2LIB_HANDLE handle, const wchar_t* FileName);
+ 	M2LIB_API EError __cdecl M2_ExportM2Intermediate(M2LIB_HANDLE handle, const wchar_t* FileName);
++	M2LIB_API EError __cdecl M2_ExtractPhys(M2LIB_HANDLE handle, const wchar_t* FileName);
+ 	M2LIB_API EError __cdecl M2_ImportM2Intermediate(M2LIB_HANDLE handle, const wchar_t* FileName);
+ 	M2LIB_API EError __cdecl M2_SetNeedRemapReferences(M2LIB_HANDLE handle, const wchar_t* remapPath);
+ 	M2LIB_API EError __cdecl M2_SetNeedRemoveTXIDChunk(M2LIB_HANDLE handle);
+diff -ru orig/M2Lib/M2Chunk.h work/M2Lib/M2Chunk.h
+--- orig/M2Lib/M2Chunk.h	2026-10-20 05:25:15.260675814 +0000
++++ work/M2Lib/M2Chunk.h	2026-10-20 05:25:24.641685245 +0000
+@@ -10,6 +10,7 @@
+ 		{
+ 			Model = 'MD21',
+ 			Physic = 'PFID',
++			PhysicData = 'PFDC',	// retail: the .phys payload stored inline in the model
+ 			Animation = 'AFID',
+ 			Skin = 'SFID',
+ 			Bone = 'BFID',
+diff -ru orig/M2Lib/M2Types.cpp work/M2Lib/M2Types.cpp
+--- orig/M2Lib/M2Types.cpp	2026-10-20 05:25:15.261258901 +0000
++++ work/M2Lib/M2Types.cpp	2026-10-20 05:25:24.642058125 +0000
+@@ -194,6 +194,14 @@
+ 			return L"error faled to save SKELETON, no file was specified.";
+ 		case EError_FailedToLoadSkeleton_CouldNotOpenFile:
+ 			return L"error: failed to load SKELETON, could not open file.";
++		case EError_FailedToExtractPhys_NoFileSpecified:
++			return L"error: failed to extract PHYS, no file was specified.";
++		case EError_FailedToExtractPhys_NoPhysicsData:
++			return L"error: this model has no physics data (no PFDC or PFID chunk).";
++		case EError_FailedToExtractPhys_PhysFileNotFound:
++			return L"error: failed to extract PHYS, the file named by the PFID chunk was not found (set the working directory, or put it next to the model).";
++		case EError_FailedToExtractPhys_CouldNotWriteFile:
++			return L"error: failed to extract PHYS, could not write the output file.";
+ 		default:
+ 			break;
+ 	}
+diff -ru orig/M2Lib/M2Types.h work/M2Lib/M2Types.h
+--- orig/M2Lib/M2Types.h	2026-10-20 05:25:15.261313608 +0000
++++ work/M2Lib/M2Types.h	2026-10-20 05:25:24.641882773 +0000
+@@ -206,6 +206,11 @@
+ 
+ 		EError_FailedToLoadSkeleton_NoFileSpecified,
+ 		EError_FailedToLoadSkeleton_CouldNotOpenFile,
++
++		EError_FailedToExtractPhys_NoFileSpecified,
++		EError_FailedToExtractPhys_NoPhysicsData,
++		EError_FailedToExtractPhys_PhysFileNotFound,
++		EError_FailedToExtractPhys_CouldNotWriteFile,
+ 	};
+ 
+ 	M2LIB_API wchar_t const* __cdecl GetErrorText(EError Error);
+diff -ru orig/M2Mod/Interop/Imports.cs work/M2Mod/Interop/Imports.cs
+--- orig/M2Mod/Interop/Imports.cs	2026-10-20 05:25:15.263209387 +0000
++++ work/M2Mod/Interop/Imports.cs	2026-10-20 05:26:28.632820130 +0000
+@@ -21,6 +21,10 @@
+             [MarshalAs(UnmanagedType.LPWStr)] string filePath);
+ 
+         [DllImport("M2Lib.dll", CallingConvention = CallingConvention.Cdecl)]
++        public static extern M2LibError M2_ExtractPhys(IntPtr handle,
++            [MarshalAs(UnmanagedType.LPWStr)] string filePath);
++
++        [DllImport("M2Lib.dll", CallingConvention = CallingConvention.Cdecl)]
+         public static extern M2LibError M2_ImportM2Intermediate(IntPtr handle,
+             [MarshalAs(UnmanagedType.LPWStr)] string filePath);
+ 
+diff -ru orig/M2Mod/Interop/Structures/M2LibError.cs work/M2Mod/Interop/Structures/M2LibError.cs
+--- orig/M2Mod/Interop/Structures/M2LibError.cs	2026-10-20 05:25:15.263303160 +0000
++++ work/M2Mod/Interop/Structures/M2LibError.cs	2026-10-20 05:26:28.632192490 +0000
+@@ -37,5 +37,10 @@
+ 
+         FailedToLoadSkeleton_NoFileSpecified,
+         FailedToLoadSkeleton_CouldNotOpenFile,
++
++        FailedToExtractPhys_NoFileSpecified,
++        FailedToExtractPhys_NoPhysicsData,
++        FailedToExtractPhys_PhysFileNotFound,
++        FailedToExtractPhys_CouldNotWriteFile,
+     }
+ }
+diff -ru orig/M2Mod/M2ModForm.Designer.cs work/M2Mod/M2ModForm.Designer.cs
+--- orig/M2Mod/M2ModForm.Designer.cs	2026-10-20 05:25:15.263469422 +0000
++++ work/M2Mod/M2ModForm.Designer.cs	2026-10-20 05:26:28.635759811 +0000
+@@ -85,6 +85,7 @@
+             this.label7 = new System.Windows.Forms.Label();
+             this.tabExport = new System.Windows.Forms.TabPage();
+             this.exportButtonGo = new M2Mod.Controls.SplitButton();
++            this.checkBoxExtractPhys = new System.Windows.Forms.CheckBox();
+             this.goButtonContextMenuStrip = new System.Windows.Forms.ContextMenuStrip(this.components);
+             this.customMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+             this.tabControl = new System.Windows.Forms.TabControl();
+@@ -662,6 +663,7 @@
+             // 
+             this.tabExport.Controls.Add(this.panelImputM2Exp);
+             this.tabExport.Controls.Add(this.panelOutputM2I);
++            this.tabExport.Controls.Add(this.checkBoxExtractPhys);
+             this.tabExport.Controls.Add(this.exportButtonGo);
+             this.tabExport.Location = new System.Drawing.Point(4, 22);
+             this.tabExport.Name = "tabExport";
+@@ -671,6 +673,17 @@
+             this.tabExport.Text = "M2 -> M2I";
+             this.tabExport.UseVisualStyleBackColor = true;
+             // 
++            // checkBoxExtractPhys
++            // 
++            this.checkBoxExtractPhys.AutoSize = true;
++            this.checkBoxExtractPhys.Location = new System.Drawing.Point(8, 72);
++            this.checkBoxExtractPhys.Name = "checkBoxExtractPhys";
++            this.checkBoxExtractPhys.Size = new System.Drawing.Size(200, 17);
++            this.checkBoxExtractPhys.TabIndex = 27;
++            this.checkBoxExtractPhys.Text = "Also extract physics (.phys)";
++            this.toolTip1.SetToolTip(this.checkBoxExtractPhys, "Retail models keep their physics inline (PFDC) or in a file named by the PFID chunk. Downporting drops both, so save it here first. The .phys is written next to the target M2I, with the same name.");
++            this.checkBoxExtractPhys.UseVisualStyleBackColor = true;
++            // 
+             // exportButtonGo
+             // 
+             this.exportButtonGo.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
+@@ -839,6 +852,7 @@
+         private System.Windows.Forms.Label label7;
+         private System.Windows.Forms.TabPage tabExport;
+         private SplitButton exportButtonGo;
++        private System.Windows.Forms.CheckBox checkBoxExtractPhys;
+         private System.Windows.Forms.TabControl tabControl;
+         private System.Windows.Forms.ComboBox profilesComboBox;
+         private System.Windows.Forms.Label profileLabel;
+diff -ru orig/M2Mod/M2ModForm.cs work/M2Mod/M2ModForm.cs
+--- orig/M2Mod/M2ModForm.cs	2026-10-20 05:25:15.263501887 +0000
++++ work/M2Mod/M2ModForm.cs	2026-10-20 05:26:28.636295466 +0000
+@@ -355,6 +355,29 @@
+                 return;
+             }
+ 
++            if (checkBoxExtractPhys.Checked)
++            {
++                // The M2I only carries what a 3.3.5 model has; the retail physics would be lost, so keep it as a .phys.
++                var physPath = Path.ChangeExtension(textBoxOutputM2I.Text, ".phys");
++                var physError = Imports.M2_ExtractPhys(m2, physPath);
++                if (physError == M2LibError.FailedToExtractPhys_NoPhysicsData)
++                {
++                    SetStatus("Export done. This model has no physics data.");
++                }
++                else if (physError != M2LibError.OK)
++                {
++                    SetStatus("Export done, but physics: " + Imports.GetErrorText(physError));
++                }
++                else
++                {
++                    SetStatus("Export done. Physics saved to " + Path.GetFileName(physPath));
++                }
++
++                exportButtonGo.Enabled = true;
++                Imports.M2_Free(m2);
++                return;
++            }
++
+             SetStatus("Export done.");
+ 
+             exportButtonGo.Enabled = true;

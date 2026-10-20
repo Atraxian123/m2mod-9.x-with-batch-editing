@@ -21,6 +21,10 @@ namespace M2Mod.Interop
             [MarshalAs(UnmanagedType.LPWStr)] string filePath);
 
         [DllImport("M2Lib.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern M2LibError M2_ExtractPhys(IntPtr handle,
+            [MarshalAs(UnmanagedType.LPWStr)] string filePath);
+
+        [DllImport("M2Lib.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern M2LibError M2_ImportM2Intermediate(IntPtr handle,
             [MarshalAs(UnmanagedType.LPWStr)] string filePath);
 
